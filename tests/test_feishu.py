@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from cs_duty.database import Database
-from cs_duty.feishu import FeishuAPI, FeishuBridge, FeishuError
+from cs_duty.feishu import FeishuAPI, FeishuBridge, FeishuError, check
 from cs_duty.settings import Settings
 
 
@@ -131,6 +131,26 @@ class FeishuCase(unittest.TestCase):
         self.bridge.notify(self.task())
         self.api.send.assert_not_called()
 
+    def test_live_check_requires_credentials_and_can_send_a_test(self):
+        api = Mock()
+        api.bot_id.return_value = 'ou_bot'
+        factory = lambda config: api
+        with self.assertRaisesRegex(FeishuError, 'App ID'):
+            check({'feishu_app_id': '', 'feishu_app_secret': ''}, api_factory=factory)
+        config = self.settings.runtime()
+        self.assertEqual(check(config, api_factory=factory), {'bot': 'ou_bot', 'chat': '', 'sent': False})
+        api.send.assert_not_called()
+        result = check(config, send=True, api_factory=factory)
+        self.assertEqual(result, {'bot': 'ou_bot', 'chat': 'oc_group', 'sent': True})
+        self.assertEqual(api.send.call_args.args[0], 'oc_group')
+
+    def test_live_check_refuses_send_without_a_chat(self):
+        api = Mock()
+        api.bot_id.return_value = 'ou_bot'
+        self.settings.save_runtime({'feishu_enabled': False, 'feishu_chat_id': ''})
+        with self.assertRaisesRegex(FeishuError, '通知会话'):
+            check(self.settings.runtime(), send=True, api_factory=lambda config: api)
+
     def test_owned_receiver_acknowledges_after_persist_and_stops(self):
         self.bridge.notify(self.task())
         original_popen = subprocess.Popen
@@ -161,6 +181,26 @@ sys.stdin.readline()
 
 
 class FeishuAPICase(unittest.TestCase):
+    def test_bot_info_accepts_flat_and_wrapped_shapes(self):
+        for payload, expected in [(b'{"code":0,"bot":{"open_id":"ou_flat"}}', 'ou_flat'),
+                                  (b'{"code":0,"data":{"bot":{"open_id":"ou_wrapped"}}}', 'ou_wrapped')]:
+            with self.subTest(payload=payload):
+                api = FeishuAPI({'feishu_app_id': 'cli_fixture', 'feishu_app_secret': 'secret-fixture'})
+                with patch('cs_duty.feishu.urllib.request.build_opener') as opener:
+                    opener.return_value.open.side_effect = [
+                        io.BytesIO(b'{"code":0,"tenant_access_token":"fixture-token","expire":7200}'),
+                        io.BytesIO(payload),
+                    ]
+                    self.assertEqual(api.bot_id(), expected)
+        api = FeishuAPI({'feishu_app_id': 'cli_fixture', 'feishu_app_secret': 'secret-fixture'})
+        with patch('cs_duty.feishu.urllib.request.build_opener') as opener:
+            opener.return_value.open.side_effect = [
+                io.BytesIO(b'{"code":0,"tenant_access_token":"fixture-token","expire":7200}'),
+                io.BytesIO(b'{"code":0,"data":{}}'),
+            ]
+            with self.assertRaises(FeishuError):
+                api.bot_id()
+
     def test_token_is_cached_and_errors_hide_response_body(self):
         api = FeishuAPI({'feishu_app_id': 'cli_fixture', 'feishu_app_secret': 'secret-fixture'})
         with patch('cs_duty.feishu.urllib.request.build_opener') as opener:

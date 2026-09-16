@@ -43,6 +43,62 @@ def main(argv=None):
         finally:
             db.close()
         return 0
+    if argv and argv[0] == 'feishu-check':
+        parser = argparse.ArgumentParser(description='用已保存的应用机器人配置检查飞书连通性（不启动接待）')
+        parser.add_argument('--data-dir', default='artifacts/app')
+        parser.add_argument('--connect', action='store_true', help='建立长连接并等待确认（最多 20 秒）')
+        parser.add_argument('--send', action='store_true', help='向已保存的通知会话发送一条不含客户资料的测试消息')
+        args = parser.parse_args(argv[1:])
+        import time
+        from pathlib import Path
+        from cs_duty.database import Database
+        from cs_duty.settings import Settings
+        from cs_duty.feishu import FeishuBridge, FeishuError, check
+        db = Database(Path(args.data_dir) / 'business.sqlite3')
+        try:
+            settings = Settings(db, None)
+            result = check(settings.runtime(), send=args.send)
+            print('应用认证成功，机器人 open_id：' + result['bot'])
+            if result['sent']:
+                print('测试通知已发送到：' + result['chat'])
+            if args.connect:
+                bridge = FeishuBridge(db, settings)
+                try:
+                    bridge.start()
+                    deadline = time.time() + 20
+                    while time.time() < deadline and bridge.status()['state'] not in ('connected', 'error'):
+                        time.sleep(.2)
+                    status = bridge.status()
+                    if status['state'] != 'connected':
+                        raise FeishuError('长连接未建立：' + status['detail'])
+                    print('飞书长连接已建立，可以接收待办处理结果。')
+                finally:
+                    bridge.stop()
+        except FeishuError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        finally:
+            db.close()
+        return 0
+    if argv and argv[0] == 'observe-jingmai':
+        parser = argparse.ArgumentParser(description='只读采集京东咚咚工作台与客服助手结构（不保存客户正文；需先停止服务）')
+        parser.add_argument('--data-dir', default='artifacts/app')
+        parser.add_argument('--out', default=None)
+        parser.add_argument('--no-wait', action='store_true', help='不等待手动打开会话')
+        args = parser.parse_args(argv[1:])
+        from pathlib import Path
+        from cs_duty.database import Database
+        from cs_duty.settings import Settings
+        from cs_duty.observe import capture
+        data_dir = Path(args.data_dir)
+        db = Database(data_dir / 'business.sqlite3')
+        try:
+            target = capture(Settings(db, None).runtime(), data_dir, args.out, wait=not args.no_wait)
+        finally:
+            db.close()
+        print('采集完成：' + target)
+        print('请确认文件不含需要保密的客户信息后再外发。')
+        return 0
     if argv and argv[0] not in ('serve', '-h', '--help'):
         from mock_dongdong.cli import main as replica_cli
         return replica_cli(argv)

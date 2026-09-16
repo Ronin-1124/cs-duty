@@ -53,7 +53,15 @@ class FeishuAPI:
             return self.token
 
     def bot_id(self):
-        return self.request('bot/v3/info')['bot']['open_id']
+        # Feishu returns bot at the top level for most tenants and under data for some;
+        # the official channel SDK accepts both shapes.
+        result = self.request('bot/v3/info')
+        data = result.get('data') if isinstance(result.get('data'), dict) else {}
+        bot = result.get('bot') or data.get('bot') or {}
+        open_id = bot.get('open_id') if isinstance(bot, dict) else ''
+        if not open_id:
+            raise FeishuError('飞书未返回机器人信息，请确认应用已开通机器人能力')
+        return open_id
 
     def send(self, chat_id, text, key):
         result = self.request('im/v1/messages?receive_id_type=chat_id', {'receive_id': chat_id,
@@ -252,3 +260,19 @@ class FeishuBridge:
         api = self.api_factory(config)
         api.send(chat, 'CS Duty 飞书连接测试：这是一条测试通知，不包含客户资料。', secrets.token_hex(16))
         return {'detail': '测试通知已发送'}
+
+
+def check(config, *, send=False, api_factory=None):
+    """Validate saved app credentials against the live tenant, optionally sending a data-free test."""
+    if not str(config.get('feishu_app_id', '')).startswith('cli_') or not config.get('feishu_app_secret'):
+        raise FeishuError('请先在管理页保存应用机器人 App ID 和 App Secret')
+    api = (api_factory or FeishuAPI)(config)
+    bot = api.bot_id()
+    result = {'bot': bot, 'chat': '', 'sent': False}
+    if send:
+        chat = str(config.get('feishu_chat_id', ''))
+        if not chat.startswith('oc_'):
+            raise FeishuError('请先在管理页配置通知会话')
+        api.send(chat, 'CS Duty 飞书连接自检：这是一条测试消息，不包含客户资料。', secrets.token_hex(16))
+        result.update(chat=chat, sent=True)
+    return result

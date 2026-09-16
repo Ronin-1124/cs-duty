@@ -34,8 +34,9 @@ def main():
                  'message_id': message.message_id, 'chat_id': message.chat_id,
                  'chat_type': message.chat_type, 'message_type': message.message_type,
                  'content': message.content, 'parent_id': message.parent_id or '',
-                 'sender_id': sender.sender_id.open_id, 'sender_type': sender.sender_type,
-                 'mentions': [{'key': m.key, 'id': m.id.open_id} for m in message.mentions or []]}
+                 'sender_id': sender.sender_id.open_id if sender.sender_id else '',
+                 'sender_type': sender.sender_type,
+                 'mentions': [{'key': m.key, 'id': m.id.open_id if m.id else ''} for m in message.mentions or []]}
         if len(json.dumps(value)) > 100000:
             return
         emit(value)
