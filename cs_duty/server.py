@@ -232,6 +232,8 @@ class Handler(MockHandler):
                 raise ValueError('未知会话操作')
         elif path == 'tasks/resolve':
             db.resolve_task(data['id'], data['result'])
+            task = db.one('SELECT conversation_id FROM tasks WHERE id=?', (data['id'],))
+            return {'state': db.conversation(task['conversation_id'])['state']}
         elif path == 'outbox':
             with db.lock:
                 item = db.one('SELECT * FROM outbox WHERE id=?', (data['id'],))
