@@ -75,6 +75,12 @@ class DataManagementCase(unittest.TestCase):
         self.assertFalse(self.db.rows('SELECT * FROM conversations'))
         self.assertTrue(self.db.rows('SELECT * FROM knowledge'))
 
+    def test_delete_all_allows_a_fresh_read(self):
+        delete_conversations(self.app, all_customers=True)
+        self.assertFalse(self.db.rows('SELECT * FROM deleted_messages'))
+        self.db.ingest('jingmai', 'test', 'buyer', '测试客户', [self.old])
+        self.assertTrue(self.db.history(self.cid))
+
     def test_active_or_paused_runtime_blocks_changes_and_export(self):
         with patch.object(self.app.runtime, 'status', return_value={'running': True, 'state': 'paused'}):
             with self.assertRaisesRegex(ValueError, '停止接待'):

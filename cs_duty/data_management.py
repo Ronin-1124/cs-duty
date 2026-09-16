@@ -55,6 +55,9 @@ def delete_conversations(app, cid=None, *, keep_customer=False, all_customers=Fa
                         db.conn.execute('DELETE FROM conversations WHERE id=?', (key,))
                 if all_customers:
                     db.conn.execute('DELETE FROM events')
+                    # A full cleanup is also a fresh start: allow the next scan to read these
+                    # conversations again instead of suppressing them as previously deleted.
+                    db.conn.execute('DELETE FROM deleted_messages')
                     for table in checkpoint_tables & {'checkpoints', 'writes'}:
                         db.conn.execute(f'DELETE FROM cleanup.{table}')
                 fixture = app.fixture._read()
@@ -139,7 +142,7 @@ def restore_workspace(archive_path, target_dir):
                 manifest = json.loads(archive.read('manifest.json'))
                 if not isinstance(manifest, dict) or not isinstance(manifest.get('files'), dict) or not isinstance(manifest.get('includes_secrets'), bool):
                     raise ValueError('迁移包清单格式错误')
-                if manifest.get('format') != 'cs-duty-workspace' or manifest.get('version') != 1:
+                if manifest.get('format') not in ('cs-duty-workspace', 'cs-rpa-workspace') or manifest.get('version') != 1:
                     raise ValueError('不支持的迁移包版本')
                 if set(manifest['files']) != set(names) - {'manifest.json'} or not {'business.sqlite3', 'mock.json'} <= set(names):
                     raise ValueError('迁移包文件清单不完整')
