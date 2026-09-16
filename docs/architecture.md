@@ -1,4 +1,4 @@
-# 本地客服应用架构
+# 本地客服应用架构（cs-duty）
 
 ## 运行边界
 
@@ -6,7 +6,8 @@
 
 ```mermaid
 flowchart TD
-  DOM[模拟或真实客服网页] --> Reader[Playwright 读取与身份校验]
+  Desk[桌面咚咚 via Linkr HID] --> Reader[槽位点击 / 区域 OCR]
+  Mock[本地模拟工作台] --> Reader
   Reader --> DB[(SQLite 客户历史)]
   DB --> Merge[消息合并与去重]
   Merge --> Retrieve[业务知识检索]
@@ -65,7 +66,7 @@ LangGraph 节点为 `retrieve → plan → validate → record_reply/create_task
 
 ## 接入扩展
 
-`BrowserAdapter` 集中保存当前 DOM 选择器，向运行器提供列出客户、打开客户读取文字、发送与确认、关闭四类操作。真实平台验证后可拆成独立适配类，业务图无需跟随页面结构修改。
+真实客户通道是 `cs_rpa.desktop.LinkrClient`：HDMI 截图 + USB HID。预录槽位见 `experiments/dongdong_slots.json`。向运行器提供列出客户、打开客户、读取聊天/订单区、填草稿；发送默认关闭。本地模拟工作台仅用于业务图回归。京东网页 DOM 不再作为产品路径。业务图无需跟随桌面改版修改，改的是槽位表。
 
 `ModelClient` 提供 OpenAI Chat Completions 与 Anthropic Messages 两种协议，统一提取最终文本并解析业务 JSON。协议错误、HTTP 认证失败、限流和超时转为脱敏错误，运行器按客户退避重试；请求失败不生成可发送回复。
 

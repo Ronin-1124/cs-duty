@@ -1,0 +1,17 @@
+{
+  "process": "jdm_dd_workbench",
+  "layout": "2560x1600-letterbox-1440",
+  "notes": "Relative to cropped window image after Linkr letterbox. Calibrate on fullscreen 咚咚. Do not click send.",
+  "slots": {
+    "session_consulting": {"x": 0.11, "y": 0.21, "label": "在线咨询/正在咨询"},
+    "session_clock": {"x": null, "y": null, "label": "最近咨询时钟，待标定"},
+    "session_recent": {"x": null, "y": null, "label": "最近联系人，待标定"},
+    "compose": {"x": 0.35, "y": 0.67, "label": "输入框"},
+    "send": {"x": null, "y": null, "label": "发送，默认禁止"}
+  },
+  "panels": {
+    "session_list": [0.08, 0.22, 0.28, 0.70],
+    "chat": [0.28, 0.22, 0.68, 0.66],
+    "order": [0.68, 0.18, 0.98, 0.85]
+  }
+}
