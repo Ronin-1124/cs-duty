@@ -9,9 +9,9 @@ from unittest.mock import Mock
 
 from playwright.sync_api import expect, sync_playwright
 
-from cs_rpa.database import ROOT
-from cs_rpa.server import create_server
-from cs_rpa.browser import BrowserAdapter
+from cs_duty.database import ROOT
+from cs_duty.server import create_server
+from cs_duty.browser import BrowserAdapter
 
 
 def check_virtual_contacts(playwright):
@@ -276,7 +276,7 @@ def main():
                 download = download_info.value
                 migration_path = output / 'workspace.zip'
                 download.save_as(migration_path)
-                from cs_rpa.data_management import restore_workspace
+                from cs_duty.data_management import restore_workspace
                 restored = restore_workspace(migration_path, Path(directory) / 'restored')
                 assert Path(restored['directory'], 'business.sqlite3').exists()
                 page.locator('.nav-item[data-view=conversations]').click()

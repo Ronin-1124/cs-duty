@@ -6,7 +6,7 @@ import json
 import time
 import urllib.request
 
-from cs_rpa.models import NoRedirect
+from cs_duty.models import NoRedirect
 
 
 def notify_task(db, settings, task):

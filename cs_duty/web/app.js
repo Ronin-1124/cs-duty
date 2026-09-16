@@ -14,7 +14,7 @@ function badge(value){return `<span class="badge ${["error","uncertain","failed"
 function date(value){return new Date(value*1000).toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});}
 function empty(title, detail, symbol="inbox"){return `<div class="empty">${icon(symbol)}<h3>${esc(title)}</h3><p>${esc(detail)}</p></div>`;}
 function toast(message, error=false){clearTimeout(toastTimer);const el=$("#toast");el.textContent=message;el.classList.toggle("error",error);el.hidden=false;toastTimer=setTimeout(()=>el.hidden=true,error?9000:4500);}
-async function api(path, body){const response=await fetch('/api/manage/'+path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json','X-CS-RPA':'1'},body:body===undefined?undefined:JSON.stringify(body)});const value=await response.json();if(!response.ok)throw new Error(value.error||'请求失败');return value;}
+async function api(path, body){const response=await fetch('/api/manage/'+path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json','X-CS-Duty':'1'},body:body===undefined?undefined:JSON.stringify(body)});const value=await response.json();if(!response.ok)throw new Error(value.error||'请求失败');return value;}
 function showView(name){if(!viewNames[name])return;activeView=name;$$('.view').forEach(el=>el.hidden=el.id!==`view-${name}`);$$('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===name));$('#page-name').textContent=viewNames[name];if(name==='knowledge')loadKnowledge();if(name==='conversations')loadHistory(true);hydrate();}
 
 function render(){
@@ -156,10 +156,10 @@ $('#delete-form').addEventListener('submit',e=>{
   });
 });
 $('#export-data').addEventListener('click',e=>perform(e.currentTarget,async()=>{
-  const response=await fetch('/api/manage/data/export',{method:'POST',headers:{'Content-Type':'application/json','X-CS-RPA':'1'},body:JSON.stringify({include_secrets:$('#export-secrets').checked})});
+  const response=await fetch('/api/manage/data/export',{method:'POST',headers:{'Content-Type':'application/json','X-CS-Duty':'1'},body:JSON.stringify({include_secrets:$('#export-secrets').checked})});
   if(!response.ok)throw new Error((await response.json()).error||'导出失败');
   const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');
-  a.href=url;a.download='cs-rpa-workspace-'+new Date().toISOString().replace(/[:.]/g,'-')+'.zip';
+  a.href=url;a.download='cs-duty-workspace-'+new Date().toISOString().replace(/[:.]/g,'-')+'.zip';
   document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);toast('迁移包已生成，请查看浏览器下载');
 }));
 

@@ -35,7 +35,7 @@
 在目标机器安装项目依赖，将导出的 ZIP 复制过去，在项目根目录执行：
 
 ```powershell
-.\run.cmd restore-data "C:\Downloads\cs-rpa-workspace.zip" --data-dir "artifacts\restored"
+.\run.cmd restore-data "C:\Downloads\cs-duty-workspace.zip" --data-dir "artifacts\restored"
 .\run.cmd serve --data-dir "artifacts\restored"
 ```
 

@@ -66,7 +66,7 @@ LangGraph 节点为 `retrieve → plan → validate → record_reply/create_task
 
 ## 接入扩展
 
-真实客户通道是 `cs_rpa.desktop.LinkrClient`：HDMI 截图 + USB HID。预录槽位见 `experiments/dongdong_slots.json`。向运行器提供列出客户、打开客户、读取聊天/订单区、填草稿；发送默认关闭。本地模拟工作台仅用于业务图回归。京东网页 DOM 不再作为产品路径。业务图无需跟随桌面改版修改，改的是槽位表。
+真实客户通道是 `cs_duty.desktop.LinkrClient`：HDMI 截图 + USB HID。预录槽位见 `experiments/dongdong_slots.json`。向运行器提供列出客户、打开客户、读取聊天/订单区、填草稿；发送默认关闭。本地模拟工作台仅用于业务图回归。京东网页 DOM 不再作为产品路径。业务图无需跟随桌面改版修改，改的是槽位表。
 
 `ModelClient` 提供 OpenAI Chat Completions 与 Anthropic Messages 两种协议，统一提取最终文本并解析业务 JSON。协议错误、HTTP 认证失败、限流和超时转为脱敏错误，运行器按客户退避重试；请求失败不生成可发送回复。
 

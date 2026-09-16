@@ -10,7 +10,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from cs_rpa.knowledge import terms
+from cs_duty.knowledge import terms
 
 FILES = {'business.sqlite3', 'checkpoints.sqlite3', 'mock.json'}
 MAX_BYTES = 512 * 1024 * 1024
@@ -107,7 +107,7 @@ def export_workspace(app, include_secrets=False):
                 source.close()
                 target.close()
             payload['checkpoints.sqlite3'] = (root / 'checkpoints.sqlite3').read_bytes()
-        manifest = {'format': 'cs-rpa-workspace', 'version': 1,
+        manifest = {'format': 'cs-duty-workspace', 'version': 1,
                     'created': datetime.now(timezone.utc).isoformat(), 'includes_secrets': include_secrets,
                     'files': {name: hashlib.sha256(data).hexdigest() for name, data in payload.items()}}
         if sum(map(len, payload.values())) > MAX_BYTES - 4096:
@@ -139,7 +139,7 @@ def restore_workspace(archive_path, target_dir):
                 manifest = json.loads(archive.read('manifest.json'))
                 if not isinstance(manifest, dict) or not isinstance(manifest.get('files'), dict) or not isinstance(manifest.get('includes_secrets'), bool):
                     raise ValueError('迁移包清单格式错误')
-                if manifest.get('format') != 'cs-rpa-workspace' or manifest.get('version') != 1:
+                if manifest.get('format') != 'cs-duty-workspace' or manifest.get('version') != 1:
                     raise ValueError('不支持的迁移包版本')
                 if set(manifest['files']) != set(names) - {'manifest.json'} or not {'business.sqlite3', 'mock.json'} <= set(names):
                     raise ValueError('迁移包文件清单不完整')

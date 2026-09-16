@@ -2,13 +2,13 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>客服控制台 · CS RPA</title>
+  <title>客服控制台 · CS Duty</title>
   <link rel="stylesheet" href="/manage/app.css">
   <script defer src="/lucide.min.js"></script><script defer src="/manage/app.js"></script>
 </head>
 <body>
   <aside class="sidebar">
-    <a class="brand" href="/manage"><span class="brand-mark"><i data-lucide="sprout"></i></span><span>CS RPA<small>客服工作空间</small></span></a>
+    <a class="brand" href="/manage"><span class="brand-mark"><i data-lucide="sprout"></i></span><span>CS Duty<small>客服工作空间</small></span></a>
     <div class="nav-label">工作台</div>
     <nav aria-label="主导航">
       <button class="nav-item active" data-view="overview"><i data-lucide="layout-dashboard"></i><span>运行总览</span></button>
@@ -104,7 +104,7 @@
         </div>
       </section>
     </main>
-    <footer class="footer"><span>CS RPA · 本地客服工作空间</span><span>消息有记录，协作有进度。</span></footer>
+    <footer class="footer"><span>CS Duty · 本地客服工作空间</span><span>消息有记录，协作有进度。</span></footer>
   </div>
   <div id="toast" role="status" hidden></div>
   <dialog id="delete-dialog"><form id="delete-form" class="form"><div class="panel-heading"><h2 id="delete-title">删除记录</h2><button type="button" class="icon-button" id="close-delete" aria-label="关闭删除确认">×</button></div><p id="delete-description"></p><p>已删除的本地消息不会在后续扫描时重新导入；客户发来新消息后仍可继续接待。此操作无法撤销，已有导出包不会随之清理。</p><label>输入“删除”确认<input name="confirmation" required pattern="删除" autocomplete="off"></label><button type="submit" class="button danger">确认删除</button></form></dialog>

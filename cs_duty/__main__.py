@@ -12,7 +12,7 @@ def main(argv=None):
         parser.add_argument('archive')
         parser.add_argument('--data-dir', required=True)
         args = parser.parse_args(argv[1:])
-        from cs_rpa.data_management import restore_workspace
+        from cs_duty.data_management import restore_workspace
         import sqlite3
         try:
             result = restore_workspace(args.archive, args.data_dir)
@@ -35,8 +35,8 @@ def main(argv=None):
         args = parser.parse_args(argv[1:])
         import json
         from pathlib import Path
-        from cs_rpa.database import Database
-        from cs_rpa.knowledge_bundle import import_bundle
+        from cs_duty.database import Database
+        from cs_duty.knowledge_bundle import import_bundle
         db = Database(Path(args.data_dir) / 'business.sqlite3')
         try:
             print(json.dumps(import_bundle(db, Path(args.bundle)), ensure_ascii=False, indent=2))
@@ -52,7 +52,7 @@ def main(argv=None):
     parser.add_argument('--port', type=int, default=18766)
     parser.add_argument('--data-dir', default=None)
     args = parser.parse_args(argv)
-    from cs_rpa.server import serve
+    from cs_duty.server import serve
     return serve(args.host, args.port, args.data_dir)
 
 

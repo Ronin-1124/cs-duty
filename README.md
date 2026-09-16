@@ -1,6 +1,6 @@
 # cs-duty
 
-客服值班台（Python 包名仍为 `cs_rpa`）。Windows 本机运行：桌面咚咚经 **Radxa Linkr**（HDMI 截图 + USB HID）读写会话，LangGraph 编排业务，MiniMax 生成方案，SQLite 保存客户上下文，飞书对接审阅同事与知识 agent。
+客服值班台（Python 包名为 `cs_duty`）。Windows 本机运行：桌面咚咚经 **Radxa Linkr**（HDMI 截图 + USB HID）读写会话，LangGraph 编排业务，MiniMax 生成方案，SQLite 保存客户上下文，飞书对接审阅同事与知识 agent。
 
 **只做三件事：** 真人账号首应防扣费；收集需求推飞书同事并双向收回；咨询题问飞书知识 agent，改写成对客短回复（机密则转人工）。打单、退款、京麦后台等 GUI 一律交给同事。不用京东网页 DOM。
 
@@ -23,7 +23,7 @@ Windows 10/11 x64，联网执行：
 
 服务只监听本机。按 Ctrl+C 停止服务及其接待浏览器；正在进行的模型请求会等待结束，默认超时 40 秒。端口已占用时拒绝启动第二个实例。也可使用 `run.cmd serve --port 18767` 或 `--data-dir artifacts/another-shop`。
 
-其他系统可以自行建立 Python 3.12 虚拟环境，安装 `requirements.txt` 和 Playwright Chromium，再执行 `python -m cs_rpa serve`；尚未完成跨平台部署验证。
+其他系统可以自行建立 Python 3.12 虚拟环境，安装 `requirements.txt` 和 Playwright Chromium，再执行 `python -m cs_duty serve`；尚未完成跨平台部署验证。
 
 ## 第一次接待
 
@@ -90,8 +90,8 @@ CSV 清洗行、问答候选、店铺规则、别名、核实事项、官方原�
 
 ## 代码结构与验证
 
-- `cs_rpa/`：应用服务、业务存储、模型协议、知识导入、LangGraph 流程、管理页面。
-- `cs_rpa/desktop/`：Linkr HID、窗口聚焦、剪贴板粘贴。
+- `cs_duty/`：应用服务、业务存储、模型协议、知识导入、LangGraph 流程、管理页面。
+- `cs_duty/desktop/`：Linkr HID、窗口聚焦、剪贴板粘贴。
 - `deploy/setup.ps1`：Windows 环境安装实现，统一由根目录 `setup.cmd` 调用。
 - `mock_dongdong/`：本地复刻网页、隔离测试数据、旧模板 DOM 回归；不会连接京东。
 - `tests/`：单元测试与可选端到端测试，不依赖真实客户资料。

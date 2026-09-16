@@ -9,7 +9,7 @@ import time
 import uuid
 from pathlib import Path
 
-from cs_rpa.knowledge import terms
+from cs_duty.knowledge import terms
 
 ROOT = Path(__file__).resolve().parents[1]
 

@@ -8,8 +8,8 @@ from typing import TypedDict
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from cs_rpa.models import ModelClient, ModelError
-from cs_rpa.settings import FIELD_LABELS
+from cs_duty.models import ModelClient, ModelError
+from cs_duty.settings import FIELD_LABELS
 
 PERSONA = """你的业务身份是店铺客服同事。以第一人称“我”和自然、温和、简洁的中文与客户沟通。
 对客户统一以“我”“这边”的客服口吻表达，不主动强调内部协作人员，不使用“转人工”“找人工”等系统口吻。

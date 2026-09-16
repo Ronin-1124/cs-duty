@@ -6,8 +6,8 @@ from urllib.parse import urlparse
 
 from dotenv import dotenv_values
 
-from cs_rpa.database import ROOT
-from cs_rpa.models import validate_profile
+from cs_duty.database import ROOT
+from cs_duty.models import validate_profile
 
 DEFAULTS = {
     'transport': 'mock', 'shop': 'local-shop', 'mode': 'draft',

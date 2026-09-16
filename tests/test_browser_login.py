@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
-from cs_rpa.browser import BrowserAdapter, BrowserNotReady, CONSULTING_TAB
+from cs_duty.browser import BrowserAdapter, BrowserNotReady, CONSULTING_TAB
 
 
 class BrowserLoginCase(unittest.TestCase):

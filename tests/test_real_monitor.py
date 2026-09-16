@@ -4,8 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock
 
-from cs_rpa.browser import BrowserAdapter
-from cs_rpa.runtime import Runtime
+from cs_duty.browser import BrowserAdapter
+from cs_duty.runtime import Runtime
 import test_service as fixtures
 
 

@@ -5,7 +5,7 @@ from unittest.mock import Mock
 from playwright._impl._errors import TargetClosedError
 from playwright.sync_api import Error
 
-from cs_rpa.browser import BrowserAdapter
+from cs_duty.browser import BrowserAdapter
 
 
 class BrowserCleanupCase(unittest.TestCase):

@@ -10,9 +10,9 @@ from unittest.mock import patch
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
-from cs_rpa.data_management import delete_conversations, export_workspace, restore_workspace
-from cs_rpa.server import Application
-from cs_rpa.workflow import Workflow
+from cs_duty.data_management import delete_conversations, export_workspace, restore_workspace
+from cs_duty.server import Application
+from cs_duty.workflow import Workflow
 
 
 class DataManagementCase(unittest.TestCase):

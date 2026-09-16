@@ -8,9 +8,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from cs_rpa.database import Database
-from cs_rpa.feishu import FeishuAPI, FeishuBridge, FeishuError
-from cs_rpa.settings import Settings
+from cs_duty.database import Database
+from cs_duty.feishu import FeishuAPI, FeishuBridge, FeishuError
+from cs_duty.settings import Settings
 
 
 class FeishuCase(unittest.TestCase):
@@ -149,7 +149,7 @@ sys.stdin.readline()
 '''
         def spawn(args, **kwargs):
             return original_popen([sys.executable, '-u', '-c', program, str(self.db.path), json.dumps(self.event())], **kwargs)
-        with patch('cs_rpa.feishu.subprocess.Popen', side_effect=spawn):
+        with patch('cs_duty.feishu.subprocess.Popen', side_effect=spawn):
             self.bridge.start()
         deadline = time.monotonic() + 5
         while self.bridge.status()['state'] not in ('persisted', 'bad_ack', 'error') and time.monotonic() < deadline:
@@ -163,7 +163,7 @@ sys.stdin.readline()
 class FeishuAPICase(unittest.TestCase):
     def test_token_is_cached_and_errors_hide_response_body(self):
         api = FeishuAPI({'feishu_app_id': 'cli_fixture', 'feishu_app_secret': 'secret-fixture'})
-        with patch('cs_rpa.feishu.urllib.request.build_opener') as opener:
+        with patch('cs_duty.feishu.urllib.request.build_opener') as opener:
             opener.return_value.open.side_effect = [
                 io.BytesIO(b'{"code":0,"tenant_access_token":"fixture-token","expire":7200}'),
                 io.BytesIO(b'{"code":0,"bot":{"open_id":"ou_bot"}}'),

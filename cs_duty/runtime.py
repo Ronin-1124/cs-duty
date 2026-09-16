@@ -10,10 +10,10 @@ from datetime import datetime
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
-from cs_rpa.browser import BrowserAdapter, BrowserNotReady
-from cs_rpa.models import ModelClient, ModelError
-from cs_rpa.notifications import notify_task
-from cs_rpa.workflow import Workflow
+from cs_duty.browser import BrowserAdapter, BrowserNotReady
+from cs_duty.models import ModelClient, ModelError
+from cs_duty.notifications import notify_task
+from cs_duty.workflow import Workflow
 
 
 class Runtime:
@@ -47,7 +47,7 @@ class Runtime:
             self.generation += 1
             self.state, self.detail = 'starting', '正在启动浏览器'
             self.db.event('runtime', '开始接待，正在连接网页')
-            self.thread = threading.Thread(target=self._run, name='cs-rpa-browser', daemon=False)
+            self.thread = threading.Thread(target=self._run, name='cs-duty-browser', daemon=False)
             self.thread.start()
 
     def pause(self):
@@ -76,7 +76,7 @@ class Runtime:
         self.baseline_count = 0
         self.drafted = {}
         checkpoint_conn = sqlite3.connect(self.db.path.parent / 'checkpoints.sqlite3', check_same_thread=False)
-        pool = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix='cs-rpa-model')
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix='cs-duty-model')
         graph = Workflow(self.db, self.settings, self.knowledge, SqliteSaver(checkpoint_conn), self.model_factory).graph
         pending, arrivals = {}, {}
         fatal_error = False

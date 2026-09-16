@@ -11,10 +11,10 @@ import time
 import urllib.request
 import re
 
-from cs_rpa.database import ROOT
-from cs_rpa.models import NoRedirect
-from cs_rpa.notifications import notify_task as notify_webhook
-from cs_rpa.settings import FIELD_LABELS
+from cs_duty.database import ROOT
+from cs_duty.models import NoRedirect
+from cs_duty.notifications import notify_task as notify_webhook
+from cs_duty.settings import FIELD_LABELS
 
 
 class FeishuError(ValueError):
@@ -94,7 +94,7 @@ class FeishuBridge:
             self.bot = self.api.bot_id()
             self.stopping.clear()
             self.state, self.detail = 'starting', '正在建立飞书长连接'
-            self.process = subprocess.Popen([sys.executable, '-u', '-m', 'cs_rpa.feishu_worker'], cwd=ROOT,
+            self.process = subprocess.Popen([sys.executable, '-u', '-m', 'cs_duty.feishu_worker'], cwd=ROOT,
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 text=True, encoding='utf-8', creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             try:
@@ -107,7 +107,7 @@ class FeishuBridge:
                 self.process.stdout.close()
                 self.state, self.detail = 'error', '飞书接收进程启动失败'
                 raise FeishuError(self.detail) from None
-            self.thread = threading.Thread(target=self._read, args=(self.process,), name='cs-rpa-feishu', daemon=False)
+            self.thread = threading.Thread(target=self._read, args=(self.process,), name='cs-duty-feishu', daemon=False)
             self.thread.start()
 
     def _read(self, process):
@@ -250,5 +250,5 @@ class FeishuBridge:
         if chat not in config['feishu_allowed_chats'] or not config['feishu_allowed_users']:
             raise ValueError('请先配置通知会话和允许用户')
         api = self.api_factory(config)
-        api.send(chat, 'CS RPA 飞书连接测试：这是一条测试通知，不包含客户资料。', secrets.token_hex(16))
+        api.send(chat, 'CS Duty 飞书连接测试：这是一条测试通知，不包含客户资料。', secrets.token_hex(16))
         return {'detail': '测试通知已发送'}

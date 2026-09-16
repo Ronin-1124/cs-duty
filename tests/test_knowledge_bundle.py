@@ -3,9 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cs_rpa.database import Database
-from cs_rpa.knowledge import Knowledge
-from cs_rpa.knowledge_bundle import FILES, import_bundle, sections
+from cs_duty.database import Database
+from cs_duty.knowledge import Knowledge
+from cs_duty.knowledge_bundle import FILES, import_bundle, sections
 
 
 class KnowledgeBundleCase(unittest.TestCase):

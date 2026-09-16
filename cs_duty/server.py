@@ -12,12 +12,12 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from cs_rpa import VERSION
-from cs_rpa.database import Database, ROOT
-from cs_rpa.knowledge import Knowledge, RAW_CSV_SOURCES
-from cs_rpa.models import ModelClient, ModelError
-from cs_rpa.runtime import Runtime
-from cs_rpa.settings import Settings
+from cs_duty import VERSION
+from cs_duty.database import Database, ROOT
+from cs_duty.knowledge import Knowledge, RAW_CSV_SOURCES
+from cs_duty.models import ModelClient, ModelError
+from cs_duty.runtime import Runtime
+from cs_duty.settings import Settings
 from mock_dongdong.server import Handler as MockHandler
 from mock_dongdong.store import Store
 
@@ -38,7 +38,7 @@ class Application:
         if adapter_factory:
             kwargs['adapter_factory'] = adapter_factory
         self.runtime = Runtime(self.db, self.settings, self.knowledge, **kwargs)
-        from cs_rpa.feishu import FeishuBridge
+        from cs_duty.feishu import FeishuBridge
         self.feishu = FeishuBridge(self.db, self.settings)
         self.runtime.notify = self.feishu.notify
         self.import_root = import_root
@@ -52,7 +52,7 @@ class Application:
             if bundle.is_dir():
                 if self.runtime.status()['running']:
                     raise ValueError('请先停止接待，再同步整理后的知识包')
-                from cs_rpa.knowledge_bundle import import_bundle
+                from cs_duty.knowledge_bundle import import_bundle
                 return [import_bundle(self.db, bundle)]
             for path in sorted((self.import_root / 'data' / 'raw').glob('*.csv')):
                 try:
@@ -135,7 +135,7 @@ class Handler(MockHandler):
         if not path.startswith('/api/manage/'):
             return super().do_POST()
         expected = 'http://' + self.headers.get('Host', '')
-        if self.headers.get('Origin') not in (None, expected) or self.headers.get('X-CS-RPA') != '1':
+        if self.headers.get('Origin') not in (None, expected) or self.headers.get('X-CS-Duty') != '1':
             return self._json(403, {'error': '请从本机管理页面操作'})
         if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
             return self._json(415, {'error': '请求必须为 JSON'})
@@ -147,11 +147,11 @@ class Handler(MockHandler):
             if not isinstance(data, dict):
                 raise ValueError('请求格式错误')
             if path == '/api/manage/data/export':
-                from cs_rpa.data_management import export_workspace
+                from cs_duty.data_management import export_workspace
                 payload = export_workspace(self.app, data.get('include_secrets', False))
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/zip')
-                self.send_header('Content-Disposition', 'attachment; filename="cs-rpa-workspace.zip"')
+                self.send_header('Content-Disposition', 'attachment; filename="cs-duty-workspace.zip"')
                 self.send_header('Content-Length', str(len(payload)))
                 self.send_header('Cache-Control', 'no-store')
                 self.end_headers()
@@ -178,7 +178,7 @@ class Handler(MockHandler):
             result = getattr(app.feishu, action)()
             return result or app.feishu.status()
         if path == 'data/delete':
-            from cs_rpa.data_management import delete_conversations
+            from cs_duty.data_management import delete_conversations
             if data.get('confirmation') != '删除':
                 raise ValueError('请输入“删除”确认操作')
             action = data.get('action')

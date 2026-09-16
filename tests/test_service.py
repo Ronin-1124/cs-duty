@@ -12,14 +12,14 @@ from urllib.request import Request, urlopen
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
-from cs_rpa.database import Database
-from cs_rpa.knowledge import Knowledge
-from cs_rpa.models import ModelClient, ModelError
-from cs_rpa.runtime import Runtime
-from cs_rpa.notifications import notify_task
-from cs_rpa.server import create_server
-from cs_rpa.settings import Settings
-from cs_rpa.workflow import Workflow
+from cs_duty.database import Database
+from cs_duty.knowledge import Knowledge
+from cs_duty.models import ModelClient, ModelError
+from cs_duty.runtime import Runtime
+from cs_duty.notifications import notify_task
+from cs_duty.server import create_server
+from cs_duty.settings import Settings
+from cs_duty.workflow import Workflow
 
 
 class ServiceCase(unittest.TestCase):
@@ -307,7 +307,7 @@ class ServiceCase(unittest.TestCase):
     def test_notifications_require_enablement_and_are_not_duplicated(self):
         tid = self.db.create_task(self.cid, 'm1', '测试需求', {})
         task = self.db.one('SELECT * FROM tasks WHERE id=?', (tid,))
-        with patch('cs_rpa.notifications.urllib.request.build_opener') as opener:
+        with patch('cs_duty.notifications.urllib.request.build_opener') as opener:
             notify_task(self.db, self.settings, task)
             opener.assert_not_called()
             self.settings.save_runtime({'feishu_enabled': True, 'feishu_webhook': 'https://open.feishu.cn/open-apis/bot/v2/hook/test', 'feishu_secret': 'fixture'})
@@ -323,7 +323,7 @@ class ServiceCase(unittest.TestCase):
             ('anthropic', {'content': [{'type': 'thinking', 'thinking': 'private'}, {'type': 'text', 'text': 'OK'}]}, '/v1/messages', 'X-api-key'),
             ('openai', {'choices': [{'message': {'content': '<think>private</think>OK', 'reasoning_content': 'private'}}]}, '/chat/completions', 'Authorization'),
         ]:
-            with self.subTest(protocol=protocol), patch('cs_rpa.models.urllib.request.build_opener') as opener:
+            with self.subTest(protocol=protocol), patch('cs_duty.models.urllib.request.build_opener') as opener:
                 opener.return_value.open.return_value = io.BytesIO(json.dumps(response).encode())
                 self.assertEqual(ModelClient({**profile, 'protocol': protocol}).complete('system', 'user'), 'OK')
                 request = opener.return_value.open.call_args.args[0]
@@ -353,7 +353,7 @@ class ManagementCase(unittest.TestCase):
                 with self.assertRaises(OSError):
                     create_server(port=server.server_address[1], data_dir=Path(directory), env_path=None, import_root=None)
                 with urlopen(Request(base + '/api/manage/settings', data=b'{"mode":"auto"}',
-                                     headers={'Content-Type': 'application/json', 'X-CS-RPA': '1'})) as response:
+                                     headers={'Content-Type': 'application/json', 'X-CS-Duty': '1'})) as response:
                     self.assertTrue(json.load(response)['ok'])
                 self.assertEqual(app.settings.runtime()['mode'], 'auto')
             finally:
