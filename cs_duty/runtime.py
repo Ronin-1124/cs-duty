@@ -5,12 +5,12 @@ import concurrent.futures
 import sqlite3
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
-from cs_duty.browser import BrowserAdapter, BrowserNotReady
+from cs_duty.browser import BrowserAdapter, BrowserNotReady, comparable_text
 from cs_duty.models import ModelClient, ModelError
 from cs_duty.notifications import notify_task
 from cs_duty.workflow import Workflow
@@ -138,7 +138,7 @@ class Runtime:
                         needs_plan = prior and prior['latest_id'] != prior['handled_id'] and prior['state'] in ('active', 'collecting') and prior['retry_after'] <= time.time() and prior['id'] not in pending
                         if hasattr(adapter, 'should_read') and not adapter.should_read(customer, force=bool(initial or ready_task or needs_plan)):
                             continue
-                        messages = adapter.open_customer(customer['name'])
+                        messages = adapter.open_customer(customer['name'], customer['customer_key'])
                         old_ids = {m['id'] for m in self.db.history(prior['id'], 500)} if prior else set()
                         cid, changed = self.db.ingest(config['transport'], config['shop'], customer['customer_key'], customer['name'], messages)
                         messages = self.db.filter_deleted(cid, messages)
@@ -148,18 +148,13 @@ class Runtime:
                             adapter.mark_read_snapshot(customer)
                         if initial:
                             baselined.add(customer['customer_key'])
-                            if self.baseline_history(cid, messages, started_at):
+                            if self.baseline_history(cid, messages, started_at, '留言' in customer.get('group', '')):
                                 with self.lock:
                                     self.baseline_count += 1
                                     self.detail = f'已初始化 {self.baseline_count} 个历史会话，仅处理新消息；无变化会话每 60 秒复核'
                                 continue
                         if prior and not initial:
-                            for msg in messages:
-                                if msg['role'] == 'agent' and msg['id'] not in old_ids:
-                                    own = self.db.one("SELECT id FROM outbox WHERE conversation_id=? AND status='sent' AND (sent_source_id=? OR (sent_source_id='' AND reply=?))", (cid, msg['id'], msg['text']))
-                                    if not own:
-                                        self.db.set_state(cid, 'human')
-                                        self.db.execute("UPDATE outbox SET status='draft',reason='检测到同事直接回复，已暂停自动处理' WHERE conversation_id=? AND status='ready'", (cid,))
+                            self._detect_manual_sends(cid, messages, old_ids)
                         current = self.db.conversation(cid)
                         if changed or cid not in arrivals:
                             arrivals[cid] = time.monotonic()
@@ -167,13 +162,14 @@ class Runtime:
                             continue
                         task = self.db.one("SELECT * FROM tasks WHERE conversation_id=? AND status='ready' ORDER BY created LIMIT 1", (cid,))
                         thread_config = {'configurable': {'thread_id': cid}}
+                        leave_message = '留言' in customer.get('group', '')
                         if task:
                             snapshot = graph.get_state(thread_config)
                             if snapshot.next:
                                 value = Command(resume={'result': task['result'], 'messages': self.db.history(cid), 'source_id': current['latest_id']}) if 'wait_colleague' in snapshot.next else None
                                 pending[cid] = (pool.submit(graph.invoke, value, thread_config), task['id'])
                             else:
-                                value = self._input(current, employee_result=task['result'])
+                                value = self._input(current, employee_result=task['result'], leave_message=leave_message)
                                 pending[cid] = (pool.submit(graph.invoke, value, thread_config), task['id'])
                             continue
                         if current['state'] == 'waiting':
@@ -185,9 +181,9 @@ class Runtime:
                         snapshot = graph.get_state(thread_config)
                         if snapshot.next and 'wait_colleague' not in snapshot.next:
                             # A faulted run is only resumed while its input is still current.
-                            value = None if snapshot.values.get('source_id') == current['latest_id'] else self._input(current)
+                            value = None if snapshot.values.get('source_id') == current['latest_id'] else self._input(current, leave_message=leave_message)
                         else:
-                            value = self._input(current)
+                            value = self._input(current, leave_message=leave_message)
                         pending[cid] = (pool.submit(graph.invoke, value, thread_config), '')
                     except Exception:
                         self.db.event('browser', '一个会话读取未完成，将在下一轮重新检查')
@@ -216,30 +212,73 @@ class Runtime:
                         self.state, self.detail = 'stopped', '已停止，浏览器已关闭'
                         self.db.event('runtime', self.detail)
 
-    def _input(self, conversation, employee_result=''):
+    def _input(self, conversation, employee_result='', leave_message=False):
         return {'conversation_id': conversation['id'], 'source_id': conversation['latest_id'],
                 'messages': self.db.history(conversation['id']), 'fields': conversation['fields'],
-                'employee_result': employee_result, 'task_id': '', 'plan': {}, 'evidence': [], 'reply': '', 'action': ''}
+                'employee_result': employee_result, 'task_id': '', 'plan': {}, 'evidence': [], 'reply': '',
+                'action': '', 'leave_message': leave_message}
 
-    def baseline_history(self, cid, messages, started_at):
-        """Do not generate replies to old transcripts; preserve messages arriving during setup."""
-        if messages:
-            raw = ' '.join(messages[-1].get('timestamp', '').split())
+    def _detect_manual_sends(self, cid, messages, old_ids):
+        """A new agent bubble is our own draft sent by hand unless it matches nothing we wrote."""
+        for msg in messages:
+            if msg['role'] != 'agent' or msg['id'] in old_ids:
+                continue
+            own = self.db.one("SELECT id FROM outbox WHERE conversation_id=? AND status='sent' AND (sent_source_id=? OR (sent_source_id='' AND reply=?))",
+                              (cid, msg['id'], msg['text']))
+            if own:
+                continue
+            pending = self.db.rows("SELECT id,reply FROM outbox WHERE conversation_id=? AND status IN ('draft','ready')", (cid,))
+            match = next((row for row in pending if comparable_text(row['reply']) == comparable_text(msg['text'])), None)
+            if match:
+                self.db.execute("UPDATE outbox SET status='sent',sent_source_id=?,reason='同事在网页手动发送',updated=? WHERE id=?",
+                                (msg['id'], time.time(), match['id']))
+                self.drafted.pop(match['id'], None)
+                continue
+            self.db.set_state(cid, 'human')
+            self.db.execute("UPDATE outbox SET status='draft',reason='检测到同事直接回复，已暂停自动处理' WHERE conversation_id=? AND status='ready'", (cid,))
+            return
+
+    @staticmethod
+    def message_time(raw, started_at):
+        text = ' '.join(str(raw or '').split())
+        if not text:
+            return None
+        now = datetime.fromtimestamp(started_at)
+        for fmt, day_offset in (('%Y-%m-%d %H:%M:%S', 0), ('%m-%d %H:%M:%S', 0), ('%m-%d %H:%M', 0),
+                                ('昨天 %H:%M:%S', -1), ('昨天 %H:%M', -1), ('%H:%M:%S', 0), ('%H:%M', 0)):
             try:
-                now = datetime.fromtimestamp(started_at)
-                stamp = datetime.strptime(raw, '%m-%d %H:%M:%S').replace(year=now.year)
+                stamp = datetime.strptime(text, fmt)
+            except ValueError:
+                continue
+            if fmt.startswith('%Y'):
+                return stamp.timestamp()
+            if fmt.startswith('%m'):
+                stamp = stamp.replace(year=now.year)
                 if stamp.timestamp() > started_at + 86400:
                     stamp = stamp.replace(year=now.year - 1)
-                if stamp.timestamp() >= int(started_at):
+                return stamp.timestamp()
+            stamp = stamp.replace(year=now.year, month=now.month, day=now.day)
+            if day_offset:
+                stamp += timedelta(days=day_offset)
+            elif stamp.timestamp() > started_at + 300:
+                stamp -= timedelta(days=1)
+            return stamp.timestamp()
+        return None
+
+    def baseline_history(self, cid, messages, started_at, reply_recent_leave=False):
+        """Do not reply to old transcripts, except a leave message awaiting an answer within a day."""
+        if messages:
+            stamp = self.message_time(messages[-1].get('timestamp', ''), started_at)
+            if stamp is not None:
+                if stamp >= int(started_at):
                     return False
-            except ValueError:
-                # If the page omits a usable timestamp, first observation is the baseline.
-                pass
+                if reply_recent_leave and messages[-1]['role'] == 'customer' and time.time() - stamp <= 86400:
+                    return False
         self.db.execute('UPDATE conversations SET handled_id=latest_id WHERE id=?', (cid,))
         return True
 
     def _fill_drafts(self, adapter):
-        for item in self.db.rows("SELECT o.*,c.name,c.state,c.latest_id FROM outbox o JOIN conversations c ON c.id=o.conversation_id WHERE o.status='draft' ORDER BY o.created"):
+        for item in self.db.rows("SELECT o.*,c.name,c.state,c.latest_id,c.customer_key FROM outbox o JOIN conversations c ON c.id=o.conversation_id WHERE o.status='draft' ORDER BY o.created"):
             if self.stop_event.is_set() or self.state != 'running':
                 break
             fingerprint = (item['source_id'], item['reply'])
@@ -251,7 +290,7 @@ class Runtime:
                 return (not self.stop_event.is_set() and self.state == 'running' and current['state'] != 'human'
                         and current['latest_id'] == item['source_id'] and reply and reply['status'] == 'draft' and reply['reply'] == item['reply'])
             try:
-                status, reason = adapter.fill_draft(item['name'], item['source_id'], item['reply'], before_fill)
+                status, reason = adapter.fill_draft(item['name'], item['source_id'], item['reply'], before_fill, item['customer_key'])
             except Exception:
                 status, reason = 'draft', '网页草稿填入未完成，请检查页面；重新开始接待可重试'
             with self.db.lock:
@@ -280,7 +319,7 @@ class Runtime:
                         return False
                     return bool(self.db.execute("UPDATE outbox SET status='sending',updated=? WHERE id=? AND status='ready'", (time.time(), item['id'])))
             try:
-                status, reason = adapter.send(current['name'], item['source_id'], item['reply'], before_click)
+                status, reason = adapter.send(current['name'], item['source_id'], item['reply'], before_click, current['customer_key'])
             except Exception:
                 old = self.db.one('SELECT status FROM outbox WHERE id=?', (item['id'],))
                 status = 'uncertain' if old['status'] == 'sending' else 'draft'

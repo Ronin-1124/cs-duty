@@ -15,6 +15,7 @@ ROWS = ACTIVE_PANE + ' .alluser-item:visible'
 EDITOR = '.EditorContent[contenteditable=true]'
 HEADER = '.chat-head-name > span'
 CONSULTING_TAB = '#t-alluser-wrap .c_tabs-nav-container > .c_tabs-tab[title="正在咨询"]'
+STABLE_KEY_ATTRS = ('data-user-id', 'data-uid', 'data-userid', 'data-customer-id', 'data-key')
 
 
 class BrowserNotReady(RuntimeError):
@@ -35,6 +36,7 @@ class BrowserAdapter:
         self.initial_keys = None
         self.read_cache = {}
         self.owned_drafts = {}
+        self.key_attrs = {}
         self.cancelled = lambda: False
 
     def should_read(self, customer, force=False):
@@ -64,15 +66,44 @@ class BrowserAdapter:
         }""", top)
 
     def contact_rows(self):
-        return self.page.locator(ROWS).evaluate_all("""rows => rows.map(row => ({
-            name: row.querySelector('.alluser-item-name')?.textContent?.trim() || '',
-            customer_key: row.getAttribute('data-user-id') || '',
-            preview: row.querySelector('.alluser-item-breifdesc')?.textContent || '',
-            date: row.querySelector('.alluser-item-date-w')?.textContent || ''
-        })).filter(row => row.name)""")
+        return self.page.locator(ACTIVE_PANE).first.evaluate("""pane => {
+            const rows = [];
+            let group = '';
+            const walk = node => {
+                for (const child of node.children) {
+                    if (child.classList?.contains('c_cas-head')) group = child.textContent.trim();
+                    else if (child.classList?.contains('alluser-item')) {
+                        if (!child.getClientRects().length) continue;
+                        const identity = {};
+                        for (const attr of child.attributes || []) {
+                            if (attr.name.indexOf('data-') === 0 && attr.value) identity[attr.name] = attr.value;
+                        }
+                        const row = {
+                            name: child.querySelector('.alluser-item-name')?.textContent?.trim() || '',
+                            identity,
+                            group,
+                            preview: child.querySelector('.alluser-item-breifdesc')?.textContent || '',
+                            date: child.querySelector('.alluser-item-date-w')?.textContent || ''
+                        };
+                        if (row.name) rows.push(row);
+                    } else walk(child);
+                }
+            };
+            walk(pane);
+            return rows;
+        }""")
+
+    @staticmethod
+    def stable_key(item):
+        identity = item.get('identity') or {}
+        for attr in STABLE_KEY_ATTRS:
+            value = identity.get(attr)
+            if value:
+                return value, attr
+        return 'name:' + item['name'], ''
 
     def collect_contacts(self):
-        found, ambiguous = {}, set()
+        found, dropped = {}, set()
         real = self.config['transport'] != 'mock'
         if real:
             self.scroll_contacts(top=True)
@@ -81,13 +112,18 @@ class BrowserAdapter:
         for _ in range(100 if real else 1):
             if self.cancelled():
                 raise BrowserNotReady('正在停止联系人扫描')
-            rows = self.contact_rows()
-            names = [r['name'] for r in rows]
-            ambiguous.update(name for name in names if names.count(name) > 1)
+            rows = [(*self.stable_key(item), item) for item in self.contact_rows()]
+            counts = {}
+            for key, _, _ in rows:
+                counts[key] = counts.get(key, 0) + 1
             before = len(found)
-            for item in rows:
-                item['customer_key'] = item['customer_key'] or 'name:' + item['name']
-                found[item['customer_key']] = item
+            for key, attr, item in rows:
+                item['customer_key'], item['key_attr'] = key, attr
+                if counts[key] > 1:
+                    dropped.add(key)
+                found[key] = item
+                if attr:
+                    self.key_attrs[key] = attr
             if not real:
                 break
             movement = self.scroll_contacts()
@@ -97,12 +133,13 @@ class BrowserAdapter:
             self.page.wait_for_timeout(200)
         else:
             raise BrowserNotReady('联系人列表尚未完整扫描，未启动历史初始化；请检查列表加载')
-        if real:
+        kept = [item for key, item in found.items() if key not in dropped]
+        if real and not dropped:
             text = self.page.locator(ACTIVE_PANE).inner_text()
             count = re.search(r'最近联系人\s*[（(](\d+)[）)]', text)
-            if count and len(found) < int(count[1]):
-                raise BrowserNotReady(f'联系人尚未完整加载：已读取 {len(found)} / {count[1]}，正在重试')
-        return [item for item in found.values() if item['name'] not in ambiguous]
+            if count and len(kept) < int(count[1]):
+                raise BrowserNotReady(f'联系人尚未完整加载：已读取 {len(kept)} / {count[1]}，正在重试')
+        return kept
 
     def start(self):
         self.playwright = sync_playwright().start()
@@ -110,10 +147,13 @@ class BrowserAdapter:
             channel = self.config['channel']
             transport = self.config['transport']
             profile = self.data_dir / 'browser' / hashlib.sha256(f"{transport}:{self.config['shop']}".encode()).hexdigest()[:16]
-            self.context = self.playwright.chromium.launch_persistent_context(
-                str(profile), channel=channel, headless=transport == 'mock',
-                viewport={'width': 1366, 'height': 960}, timeout=20000,
-            )
+            options = {'channel': channel, 'headless': transport == 'mock', 'timeout': 20000}
+            if transport == 'mock':
+                options['viewport'] = {'width': 1366, 'height': 960}
+            else:
+                # Headed real browser: let the page fill whatever window size the user keeps.
+                options['no_viewport'] = True
+            self.context = self.playwright.chromium.launch_persistent_context(str(profile), **options)
             self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
             self.page.set_default_timeout(6000)
             self.page.goto(self.config['mock_url'] if transport == 'mock' else self.config['jd_url'], wait_until='domcontentloaded', timeout=20000)
@@ -171,40 +211,65 @@ class BrowserAdapter:
         self.cursor = (start + self.config['max_sessions']) % len(items)
         return ordered[:self.config['max_sessions']]
 
-    def open_customer(self, name):
-        self.guard()
-        self.select_consulting()
-        row = self.page.locator(ROWS).filter(has=self.page.get_by_text(name, exact=True))
-        if self.config['transport'] != 'mock' and row.count() == 0:
-            self.scroll_contacts(top=True)
-            for _ in range(100):
-                if self.cancelled():
-                    raise BrowserNotReady('正在停止会话读取')
-                self.page.wait_for_timeout(150)
-                if row.count():
-                    break
-                move = self.scroll_contacts()
-                if not move['moved']:
-                    break
-        expect(row).to_have_count(1)
-        current = self.page.locator(HEADER).first.inner_text() if self.page.locator(HEADER).count() else ''
-        if current != name:
-            row.click()
-        expect(self.page.locator(HEADER).first).to_have_text(name)
-        expect(self.page.locator(EDITOR)).to_be_visible()
-        # Header and transcript update separately; require stable message IDs.
-        previous = None
-        stable_since = time.monotonic()
+    def row_locator(self, name, key):
+        attr = self.key_attrs.get(key) if key and not key.startswith('name:') else ''
+        if attr:
+            value = key.replace('\\', '\\\\').replace('"', '\\"')
+            return self.page.locator(f'{ROWS}[{attr}="{value}"]')
+        return self.page.locator(ROWS).filter(has=self.page.get_by_text(name, exact=True))
+
+    def stable_messages(self, previous_ids=None):
+        """Wait until the transcript left the previously open conversation and stopped changing."""
+        previous, stable_since = previous_ids, time.monotonic()
+        switched = previous_ids is None
+        switch_deadline = time.monotonic() + 2
         deadline = time.monotonic() + 7
         while time.monotonic() < deadline:
             messages = self.read_messages()
             ids = [m['id'] for m in messages]
+            if not switched:
+                if ids != previous_ids:
+                    switched = True
+                elif time.monotonic() >= switch_deadline:
+                    switched = True
+                else:
+                    self.page.wait_for_timeout(100)
+                    continue
             if ids != previous:
                 previous, stable_since = ids, time.monotonic()
             if time.monotonic() - stable_since >= .4:
                 return messages
             self.page.wait_for_timeout(100)
         raise RuntimeError('聊天记录未稳定加载')
+
+    def open_customer(self, name, key=''):
+        self.guard()
+        self.select_consulting()
+        header = self.page.locator(HEADER).first
+        current = header.inner_text() if header.count() else ''
+        previous_ids = None
+        if current != name:
+            row = self.row_locator(name, key)
+            if self.config['transport'] != 'mock':
+                self.scroll_contacts(top=True)
+                for _ in range(100):
+                    if self.cancelled():
+                        raise BrowserNotReady('正在停止会话读取')
+                    if row.count():
+                        break
+                    self.page.wait_for_timeout(150)
+                    if not self.scroll_contacts()['moved']:
+                        break
+            count = row.count()
+            if count == 0:
+                raise BrowserNotReady('列表中找不到目标会话，请确认列表已加载')
+            if count > 1:
+                raise BrowserNotReady('存在无法区分的同名会话，已跳过以避免上下文混淆')
+            previous_ids = [m['id'] for m in self.read_messages()]
+            row.click()
+            expect(header).to_have_text(name)
+        expect(self.page.locator(EDITOR)).to_be_visible()
+        return self.stable_messages(previous_ids)
 
     def read_messages(self):
         return self.page.locator('#t-chat-scroll .message').evaluate_all("""nodes => nodes.flatMap(node => {
@@ -215,8 +280,8 @@ class BrowserAdapter:
                 text: body.textContent, timestamp: side.querySelector('.message__time_str')?.textContent || ''}];
         })""")
 
-    def fill_draft(self, name, source_id, reply, before_fill):
-        messages = self.open_customer(name)
+    def fill_draft(self, name, source_id, reply, before_fill, key=''):
+        messages = self.open_customer(name, key)
         if not messages or messages[-1]['id'] != source_id:
             return 'stale', '网页已有新消息，本条回复已取消'
         editor = self.page.locator(EDITOR)
@@ -236,9 +301,9 @@ class BrowserAdapter:
             return 'stale', '发送前会话发生变化'
         return 'filled', '已填入网页输入框，未发送'
 
-    def send(self, name, source_id, reply, before_click):
+    def send(self, name, source_id, reply, before_click, key=''):
         self.confirmed_message = None
-        status, reason = self.fill_draft(name, source_id, reply, lambda: True)
+        status, reason = self.fill_draft(name, source_id, reply, lambda: True, key)
         if status != 'filled':
             return status, reason
         editor = self.page.locator(EDITOR)

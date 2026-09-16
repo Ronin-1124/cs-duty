@@ -273,6 +273,18 @@ class ServiceCase(unittest.TestCase):
         self.assertEqual(json.loads(task['fields'])['product'], 'TEST-1')
         self.assertEqual(self.db.one("SELECT reply FROM outbox WHERE source_id='m3'")['reply'], '我帮您看看，稍等。')
 
+    def test_leave_message_handoff_reports_without_holding_reply_then_resumes(self):
+        graph = self.graph('after_sales')
+        graph.invoke({**self.value(), 'leave_message': True}, self.config)
+        task = self.db.one('SELECT * FROM tasks')
+        self.assertTrue(task)
+        self.assertFalse(self.db.rows('SELECT * FROM outbox'))
+        self.assertEqual(self.db.conversation(self.cid)['state'], 'waiting')
+        self.db.resolve_task(task['id'], '已确认可以换货。')
+        graph.invoke(Command(resume={'result': '已确认可以换货。', 'messages': self.db.history(self.cid), 'source_id': 'm1'}), self.config)
+        self.assertIn('换货', self.db.one('SELECT reply FROM outbox')['reply'])
+        self.assertEqual(self.db.conversation(self.cid)['state'], 'active')
+
     def test_confirmed_results_use_customer_service_voice_and_keep_qualifiers(self):
         for original, expected in [
             ('同事提到我们这边有一款 TEST-1，库存还需要核实。', '这边帮您确认到，有一款 TEST-1，库存还需要核实。'),
@@ -294,7 +306,7 @@ class ServiceCase(unittest.TestCase):
         db = self.db
 
         class Adapter:
-            def send(self, name, source_id, reply, before_click):
+            def send(self, name, source_id, reply, before_click, key=''):
                 db.outbox_status(oid, 'cancelled')
                 self.clicked = before_click()
                 return 'draft', '发送被取消'

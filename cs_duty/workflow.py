@@ -53,6 +53,7 @@ class State(TypedDict, total=False):
     action: str
     task_id: str
     collection_intent: str
+    leave_message: bool
 
 
 class Workflow:
@@ -158,15 +159,16 @@ class Workflow:
                 raise ModelError('知识引用格式错误')
             if plan.get('need_colleague') or intent in ('quote', 'after_sales') or not (set(cited) & known):
                 action = 'handoff'
+        no_holding_reply = action == 'handoff' and state.get('leave_message')
         if action == 'handoff':
-            reply = '我帮您看看，稍等。'
+            reply = '' if no_holding_reply else '我帮您看看，稍等。'
         if state.get('employee_result'):
             # Normalize common affirmative reporting prefixes, preserving the actual conclusion.
             reply = re.sub(r'^同事(?:已经|已|帮您|帮你)?(?:确认了|确认到|提到)[，,：:\s]*(?:我们这边)?',
                            '这边帮您确认到，', reply)
         for old, new in [('转人工', '进一步核实'), ('找人工', '进一步核实'), ('人工客服', '客服')]:
             reply = reply.replace(old, new)
-        if action != 'ignore' and (not reply or len(reply) > 2000):
+        if action != 'ignore' and not no_holding_reply and (not reply or len(reply) > 2000):
             raise ModelError('回复为空或过长，本轮未发送')
         return {'fields': fields, 'reply': reply, 'action': action}
 
@@ -198,9 +200,10 @@ class Workflow:
             summary = str(state['plan'].get('reason') or state['messages'][-1]['text'])[:2000]
             tid = self.db.create_task(cid, state['source_id'], summary, state['fields'])
             self.db.set_state(cid, 'waiting', state['fields'])
-            config = self.settings.runtime()
-            status = 'ready' if config['mode'] == 'auto' else 'draft'
-            self.db.prepare_reply(cid, state['source_id'], state['reply'], status, '等待同事确认')
+            if not state.get('leave_message'):
+                config = self.settings.runtime()
+                status = 'ready' if config['mode'] == 'auto' else 'draft'
+                self.db.prepare_reply(cid, state['source_id'], state['reply'], status, '等待同事确认')
             return {'task_id': tid}
 
 
