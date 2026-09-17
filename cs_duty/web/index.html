@@ -51,15 +51,19 @@
         <div class="settings-layout"><article class="panel"><div class="panel-heading"><h2>已保存的连接</h2></div><div id="profiles"></div></article><article class="panel"><div class="panel-heading"><h2 id="profile-form-title">编辑模型连接</h2><span class="badge neutral">本机保存</span></div><form id="profile-form" class="form"><input type="hidden" name="id"><label>配置名称<input name="name" required placeholder="例如：MiniMax 主模型"></label><div class="form-row"><label>接口协议<select name="protocol"><option value="anthropic">Anthropic Messages</option><option value="openai">OpenAI Chat Completions</option></select></label><label>模型名称<input name="model" required value="MiniMax-M3"></label></div><label>API 地址<input name="base_url" type="url" required placeholder="https://api.minimax.cn/anthropic"></label><label>API Key<input name="api_key" type="password" autocomplete="new-password" placeholder="填写新密钥，留空保留已保存密钥"><small>保存后不再显示密钥内容。</small></label><div class="form-row"><label>请求超时（秒）<input name="timeout" type="number" min="5" max="120" value="40" required></label><label>最大输出长度<input name="max_tokens" type="number" min="128" max="8192" value="1800" required></label></div><div class="form-footer"><span class="muted">修改前请先停止接待。</span><button class="button primary" type="submit"><i data-lucide="save"></i>保存连接</button></div></form></article></div>
       </section>
       <section class="view" id="view-settings" hidden>
-        <div class="page-heading"><div><p class="eyebrow">WORKSPACE SETTINGS</p><h1>接待设置</h1><p>选择网页来源、回复方式和同事协作渠道。</p></div></div>
+        <div class="page-heading"><div><p class="eyebrow">WORKSPACE SETTINGS</p><h1>接待设置</h1><p>选择接入来源、回复方式和同事协作渠道。</p></div></div>
         <form id="settings-form" class="settings-form">
         <article class="panel reception-settings"><div class="panel-heading"><h2>接待方式</h2><span class="muted">停止接待后可修改，下次开始时生效</span></div><div class="form">
           <div class="reception-choices">
-            <label class="setting-choice"><span class="eyebrow">01 · 页面来源</span><select name="transport"><option value="mock">模拟页面</option><option value="jingmai">真实页面 · 京东京麦</option></select><small id="source-description">使用本机模拟工作台接收测试咨询。</small></label>
+            <label class="setting-choice"><span class="eyebrow">01 · 接入来源</span><select name="transport"><option value="desktop">桌面客户端 · Linkr</option><option value="mock">模拟页面</option><option value="jingmai">真实页面 · 京东京麦</option></select><small id="source-description">通过 Radxa Linkr 读取桌面客户端截图并用 OCR 识别会话。</small></label>
             <label class="setting-choice"><span class="eyebrow">02 · 回复方式</span><select name="mode"><option value="draft">填写草稿</option><option value="auto">自动发送</option></select><small id="mode-description">将回复填入客服网页输入框，不点击发送。</small></label>
           </div>
           <div class="reception-summary" id="reception-summary"></div>
-          <div class="form-row"><label>店铺标识<input name="shop" required placeholder="例如：radxa-jd"></label><label>使用浏览器<select name="channel"><option value="msedge">Microsoft Edge</option><option value="chromium">Chromium</option><option value="chrome">Google Chrome</option></select></label></div>
+          <div class="form-row"><label>店铺标识<input name="shop" required placeholder="例如：radxa-jd"></label><label id="channel-choice">使用浏览器<select name="channel"><option value="msedge">Microsoft Edge</option><option value="chromium">Chromium</option><option value="chrome">Google Chrome</option></select></label></div>
+          <div id="linkr-fields" class="form-stack">
+            <div class="form-row"><label>Linkr 地址<input name="linkr_url" placeholder="留空使用 .env 或 http://linkr-usb.local"></label><label>Linkr Token<input name="linkr_token" type="password" autocomplete="new-password" placeholder="留空使用 .env 中的 LINKR_TOKEN"></label></div>
+            <label class="switch-label"><input name="allow_send" type="checkbox">允许自动点击发送（需先完成发送槽位标定）</label>
+          </div>
           <label id="mock-address">模拟页面地址<input name="mock_url" type="url" required></label>
           <label id="real-address">真实页面地址<input name="jd_url" type="url" required></label>
           <details class="reception-advanced"><summary>读取与消息合并</summary><div class="form-row thirds"><label>扫描间隔（秒）<input name="poll_seconds" type="number" min="1" max="60"></label><label>消息合并等待（秒）<input name="merge_seconds" type="number" min="0" max="20"></label><label>每轮客户上限<input name="max_sessions" type="number" min="1" max="500"></label></div></details>

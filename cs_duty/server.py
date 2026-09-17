@@ -24,6 +24,14 @@ from mock_dongdong.store import Store
 WEB = Path(__file__).resolve().parent / 'web'
 
 
+def default_adapter_factory(config, data_dir):
+    if config.get('transport') == 'desktop':
+        from cs_duty.desktop.adapter import DesktopAdapter
+        return DesktopAdapter(config, data_dir)
+    from cs_duty.browser import BrowserAdapter
+    return BrowserAdapter(config, data_dir)
+
+
 class Application:
     def __init__(self, data_dir, base_url, env_path=ROOT / '.env', import_root=ROOT, model_factory=ModelClient, adapter_factory=None):
         self.db = Database(data_dir / 'business.sqlite3')
@@ -34,10 +42,9 @@ class Application:
         self.knowledge = Knowledge(self.db)
         self.fixture = Store(data_dir / 'mock.json')
         self.model_factory = model_factory
-        kwargs = {'model_factory': model_factory}
-        if adapter_factory:
-            kwargs['adapter_factory'] = adapter_factory
-        self.runtime = Runtime(self.db, self.settings, self.knowledge, **kwargs)
+        self.runtime = Runtime(self.db, self.settings, self.knowledge,
+                               adapter_factory=adapter_factory or default_adapter_factory,
+                               model_factory=model_factory)
         from cs_duty.feishu import FeishuBridge
         self.feishu = FeishuBridge(self.db, self.settings)
         self.runtime.notify = self.feishu.notify

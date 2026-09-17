@@ -13,6 +13,7 @@ DEFAULTS = {
     'transport': 'mock', 'shop': 'local-shop', 'mode': 'draft',
     'mock_url': 'http://127.0.0.1:18766/workbench', 'jd_url': 'https://dongdong.jd.com/',
     'channel': 'msedge', 'poll_seconds': 2, 'merge_seconds': 2, 'max_sessions': 100,
+    'linkr_url': '', 'linkr_token': '', 'allow_send': False, 'ocr_language': 'zh-Hans-CN',
     'custom_fields': ['product', 'requirements', 'quantity', 'deadline', 'contact'],
     'feishu_webhook': '', 'feishu_secret': '', 'feishu_enabled': False,
     'feishu_mode': 'webhook', 'feishu_app_id': '', 'feishu_app_secret': '',
@@ -42,16 +43,17 @@ class Settings:
             config['has_feishu_webhook'] = bool(config.pop('feishu_webhook', ''))
             config['has_feishu_secret'] = bool(config.pop('feishu_secret', ''))
             config['has_feishu_app_secret'] = bool(config.pop('feishu_app_secret', ''))
+            config['has_linkr_token'] = bool(config.pop('linkr_token', ''))
         return config
 
     def save_runtime(self, data):
         config = self.runtime()
         for key in DEFAULTS:
             if key in data:
-                if key in ('feishu_webhook', 'feishu_secret', 'feishu_app_secret') and not data[key]:
+                if key in ('feishu_webhook', 'feishu_secret', 'feishu_app_secret', 'linkr_token') and not data[key]:
                     continue
                 config[key] = data[key]
-        if config['transport'] not in ('mock', 'jingmai') or config['mode'] not in ('draft', 'auto'):
+        if config['transport'] not in ('mock', 'jingmai', 'desktop') or config['mode'] not in ('draft', 'auto'):
             raise ValueError('无效运行模式')
         if not isinstance(config['shop'], str) or not config['shop'].strip() or len(config['shop']) > 80:
             raise ValueError('请填写店铺标识')
@@ -59,14 +61,27 @@ class Settings:
             config[key] = int(config[key])
         if not 1 <= config['poll_seconds'] <= 60 or not 0 <= config['merge_seconds'] <= 20 or not 1 <= config['max_sessions'] <= 500:
             raise ValueError('轮询 1–60 秒、合并等待 0–20 秒、每轮会话上限 1–500')
-        if config['channel'] not in ('msedge', 'chromium', 'chrome'):
-            raise ValueError('无效浏览器类型')
-        mock = urlparse(config['mock_url'])
-        if mock.scheme != 'http' or mock.hostname not in ('127.0.0.1', 'localhost', '::1'):
-            raise ValueError('模拟页面必须是本机 HTTP 地址')
-        real = urlparse(config['jd_url'])
-        if real.scheme != 'https' or real.hostname != 'dongdong.jd.com':
-            raise ValueError('京东适配目前仅支持 https://dongdong.jd.com/')
+        if config['transport'] != 'desktop':
+            if config['channel'] not in ('msedge', 'chromium', 'chrome'):
+                raise ValueError('无效浏览器类型')
+            mock = urlparse(config['mock_url'])
+            if mock.scheme != 'http' or mock.hostname not in ('127.0.0.1', 'localhost', '::1'):
+                raise ValueError('模拟页面必须是本机 HTTP 地址')
+            real = urlparse(config['jd_url'])
+            if real.scheme != 'https' or real.hostname != 'dongdong.jd.com':
+                raise ValueError('京东适配目前仅支持 https://dongdong.jd.com/')
+        if not isinstance(config['linkr_url'], str) or len(config['linkr_url']) > 300:
+            raise ValueError('Linkr 地址格式错误')
+        if config['linkr_url']:
+            linkr = urlparse(config['linkr_url'])
+            if linkr.scheme not in ('http', 'https') or not linkr.hostname:
+                raise ValueError('请填写 Linkr 地址（http 或 https）')
+        if not isinstance(config['linkr_token'], str) or len(config['linkr_token']) > 512:
+            raise ValueError('Linkr Token 格式错误')
+        if not isinstance(config['allow_send'], bool):
+            raise ValueError('自动发送开关无效')
+        if not isinstance(config['ocr_language'], str) or not config['ocr_language'].strip() or len(config['ocr_language']) > 32:
+            raise ValueError('OCR 语言标记格式错误')
         if not isinstance(config['custom_fields'], list) or not config['custom_fields'] or any(f not in FIELD_LABELS for f in config['custom_fields']):
             raise ValueError('定制收集字段无效')
         if config['feishu_webhook']:

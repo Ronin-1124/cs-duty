@@ -90,6 +90,7 @@ function fillSettings(){
   form.elements.feishu_webhook.placeholder=state.config.has_feishu_webhook?'已保存，留空保留':'填写机器人 Webhook';
   form.elements.feishu_secret.placeholder=state.config.has_feishu_secret?'已保存，留空保留':'可选：机器人签名密钥';
   form.elements.feishu_app_secret.placeholder=state.config.has_feishu_app_secret?'已保存，留空保留':'填写应用 App Secret';
+  form.elements.linkr_token.placeholder=state.config.has_linkr_token?'已保存，留空保留':'留空使用 .env 中的 LINKR_TOKEN';
   updateReception();updateFeishu();
   $('#custom-fields').innerHTML=Object.entries(fields).map(([key,label])=>`<label><input type="checkbox" name="custom_field" value="${key}" ${state.config.custom_fields.includes(key)?'checked':''}>${label}</label>`).join('');
 }
@@ -125,7 +126,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('input',e=>{if(e.target.dataset.edit)edits.set(e.target.dataset.edit,e.target.value);if(e.target.dataset.result)taskResults.set(e.target.dataset.result,e.target.value);});
 $('#profile-form').addEventListener('submit',e=>{e.preventDefault();perform($('button[type=submit]',e.target),async()=>{const data=Object.fromEntries(new FormData(e.target));const saved=await api('profiles/save',data);e.target.elements.id.value=saved.id;e.target.elements.api_key.value='';e.target.elements.api_key.required=false;toast('模型连接已保存');});});
 $('#new-profile').addEventListener('click',()=>fillProfile());
-$('#settings-form').addEventListener('submit',e=>{e.preventDefault();perform($('button[type=submit]',e.target),async()=>{const form=new FormData(e.target);const data=Object.fromEntries(form);data.custom_fields=form.getAll('custom_field');data.feishu_enabled=e.target.elements.feishu_enabled.checked;data.feishu_allow_private=e.target.elements.feishu_allow_private.checked;for(const key of ['feishu_allowed_users','feishu_allowed_chats'])data[key]=parseIDs(data[key]);delete data.custom_field;await api('settings',data);for(const key of ['feishu_webhook','feishu_secret','feishu_app_secret'])e.target.elements[key].value='';toast('接待设置已保存，下次连接或启动生效');});});
+$('#settings-form').addEventListener('submit',e=>{e.preventDefault();perform($('button[type=submit]',e.target),async()=>{const form=new FormData(e.target);const data=Object.fromEntries(form);data.custom_fields=form.getAll('custom_field');data.feishu_enabled=e.target.elements.feishu_enabled.checked;data.feishu_allow_private=e.target.elements.feishu_allow_private.checked;data.allow_send=e.target.elements.allow_send.checked;for(const key of ['feishu_allowed_users','feishu_allowed_chats'])data[key]=parseIDs(data[key]);delete data.custom_field;await api('settings',data);for(const key of ['feishu_webhook','feishu_secret','feishu_app_secret','linkr_token'])e.target.elements[key].value='';toast('接待设置已保存，下次连接或启动生效');});});
 $('#import-project').addEventListener('click',e=>perform(e.currentTarget,async()=>{const data=await api('knowledge/import-project',{});toast(data.results.map(r=>r.error?`${r.file}：${r.error}`:`${r.file}：新增 ${r.inserted}，重复 ${r.duplicates}`).join('；')||'data/raw/ 中没有 CSV 文件');await loadKnowledge();}));
 $('#csv-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>4000000)throw new Error('请选择 4 MB 以内的文件');const bytes=await file.arrayBuffer();let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{text=new TextDecoder('gb18030').decode(bytes);}const data=await api('knowledge/import',{filename:file.name,text});toast(`新增 ${data.inserted} 条，跳过 ${data.duplicates} 条重复记录。`);await refresh();await loadKnowledge();}catch(err){toast(err.message,true);}finally{e.target.value='';}});
 let searchTimer;$('#knowledge-search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(loadKnowledge,250);});
@@ -164,11 +165,11 @@ $('#export-data').addEventListener('click',e=>perform(e.currentTarget,async()=>{
 }));
 
 function updateReception(){
-  const form=$('#settings-form'),real=form.elements.transport.value==='jingmai',auto=form.elements.mode.value==='auto';
-  $('#mock-address').hidden=real;$('#real-address').hidden=!real;
-  $('#source-description').textContent=real?'打开京麦工作台，登录后读取正在咨询。':'使用本机模拟工作台接收测试咨询。';
-  $('#mode-description').textContent=auto?'由 RPA 填入回复、点击发送，并核对发送结果。':'由 RPA 填入网页输入框，保留草稿，不点击发送。';
-  $('#reception-summary').textContent=(real?'真实页面 · 京东京麦':'模拟页面')+' / '+(auto?'自动发送':'填写草稿');
+  const form=$('#settings-form'),transport=form.elements.transport.value,real=transport==='jingmai',desktop=transport==='desktop',auto=form.elements.mode.value==='auto';
+  $('#mock-address').hidden=transport!=='mock';$('#real-address').hidden=!real;$('#channel-choice').hidden=desktop;$('#linkr-fields').hidden=!desktop;
+  $('#source-description').textContent=desktop?'通过 Radxa Linkr 读取桌面客户端截图并用 OCR 识别会话。':real?'打开京麦工作台，登录后读取正在咨询。':'使用本机模拟工作台接收测试咨询。';
+  $('#mode-description').textContent=auto?(desktop?'由程序填入回复并点击发送，再核对发送结果。':'由 RPA 填入回复、点击发送，并核对发送结果。'):(desktop?'由程序粘贴到客户端输入框，保留草稿，不点击发送。':'由 RPA 填入网页输入框，保留草稿，不点击发送。');
+  $('#reception-summary').textContent=(desktop?'桌面客户端 · Linkr':real?'真实页面 · 京东京麦':'模拟页面')+' / '+(auto?'自动发送':'填写草稿');
 }
 $('#settings-form').addEventListener('change',updateReception);
 
