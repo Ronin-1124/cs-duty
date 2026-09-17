@@ -1,6 +1,6 @@
 # cs-duty
 
-客服值班台（Python 包名为 `cs_duty`）。Windows 本机运行：桌面咚咚经 **Radxa Linkr**（HDMI 截图 + USB HID）读写会话，LangGraph 编排业务，MiniMax 生成方案，SQLite 保存客户上下文，飞书对接审阅同事与知识 agent。
+客服值班台（Python 包名为 `cs_duty`）。Windows 本机运行：电商后台客户端经 **Radxa Linkr**（HDMI 截图 + USB HID）读写会话，LangGraph 编排业务，MiniMax 生成方案，SQLite 保存客户上下文，飞书对接审阅同事与知识 agent。
 
 **只做三件事：** 真人账号首应防扣费；收集需求推飞书同事并双向收回；咨询题问飞书知识 agent，改写成对客短回复（机密则转人工）。打单、退款、京麦后台等 GUI 一律交给同事。不用京东网页 DOM。
 
@@ -15,7 +15,7 @@ Windows 10/11 x64，联网执行：
 
 `setup.cmd` 安装项目依赖；没有项目虚拟环境时，通过 [uv 官方安装器](https://docs.astral.sh/uv/reference/installer/)下载项目内的 Python 3.12，无需预装 Python。下载的运行时位于 `artifacts/runtime/`，不修改系统 PATH。优先使用已安装的 Edge；没有 Edge 时安装 Chromium，需要在接待设置中选择 Chromium。第一次安装需要访问 Astral、GitHub 和 Python 包源。
 
-当前机器已经安装好依赖，直接运行 `run.cmd serve` 即可。
+运行 `run.cmd serve` 以启动服务。
 
 - 客服管理：<http://127.0.0.1:18766/manage>
 - 模拟客户：<http://127.0.0.1:18766/control>
@@ -23,7 +23,7 @@ Windows 10/11 x64，联网执行：
 
 服务只监听本机。按 Ctrl+C 停止服务及其接待浏览器；正在进行的模型请求会等待结束，默认超时 40 秒。端口已占用时拒绝启动第二个实例。也可使用 `run.cmd serve --port 18767` 或 `--data-dir artifacts/another-shop`。
 
-其他系统可以自行建立 Python 3.12 虚拟环境，安装 `requirements.txt` 和 Playwright Chromium，再执行 `python -m cs_duty serve`；尚未完成跨平台部署验证。
+其他系统可以自行建立 Python 3.12 虚拟环境，安装 `requirements.txt` 和 Playwright Chromium，再执行 `python -m cs_duty serve`；尚未完成跨平台部署验证。 
 
 ## 第一次接待
 
