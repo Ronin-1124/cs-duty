@@ -1,4 +1,4 @@
-"""The offline CLI must remain usable without Windows or browser dependencies."""
+"""The offline CLI must remain usable without a live client or model connection."""
 import contextlib
 import io
 import subprocess
@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class CliTests(unittest.TestCase):
     def test_help_without_site_packages(self):
-        for module, arguments in [(module, args) for module in ('mock_dongdong', 'cs_duty')
-                                  for args in ([], ['serve'], ['demo'])]:
+        for module, arguments in [(module, args) for module in ('cs_duty',)
+                                  for args in ([], ['serve'])]:
             with self.subTest(module=module, command=arguments):
                 result = subprocess.run(
                     [sys.executable, "-S", "-m", module, *arguments, "--help"],

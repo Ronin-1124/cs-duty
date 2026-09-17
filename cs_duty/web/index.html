@@ -26,14 +26,14 @@
     <header class="topbar"><div><span class="breadcrumb">工作空间</span><span class="slash">/</span><span id="page-name">运行总览</span></div><div class="topbar-right"><span id="connection" class="connection"><span class="local-dot"></span>正在连接</span><span class="avatar">客</span></div></header>
     <main>
       <section class="view" id="view-overview">
-        <div class="page-heading"><div><p class="eyebrow">SERVICE WORKSPACE</p><h1>运行总览</h1><p>掌握接待进度，随时与同事协同。</p></div><div class="heading-links"><a class="button secondary" href="/control" target="_blank" rel="noopener"><i data-lucide="user-round"></i>模拟客户</a><a class="button secondary" href="/workbench" target="_blank" rel="noopener"><i data-lucide="external-link"></i>模拟工作台</a></div></div>
-        <div class="stats"><article class="stat"><span class="stat-icon"><i data-lucide="messages-square"></i></span><span>已同步客户</span><strong id="stat-conversations">0</strong><small>按店铺独立保存</small></article><article class="stat"><span class="stat-icon"><i data-lucide="send"></i></span><span>已确认发送</span><strong id="stat-sent">0</strong><small>已在网页中核对</small></article><article class="stat"><span class="stat-icon"><i data-lucide="file-pen-line"></i></span><span>回复草稿</span><strong id="stat-drafts">0</strong><small>已生成，等待发送</small></article><article class="stat"><span class="stat-icon"><i data-lucide="clipboard-list"></i></span><span>待同事处理</span><strong id="stat-tasks">0</strong><small>补充结果后继续接待</small></article></div>
-        <article class="runtime-card"><div class="runtime-main"><div class="runtime-title"><span class="runtime-symbol"><i data-lucide="radio"></i></span><div><span class="eyebrow">接待状态</span><h2 id="runtime-title">服务已就绪</h2></div><span class="badge" id="runtime-badge">未启动</span></div><p id="runtime-detail">配置接待方式后，即可开始读取客户消息。</p><div class="runtime-meta"><span><small>接入页面</small><b id="runtime-target">模拟页面</b></span><span><small>当前模型</small><b id="runtime-model">待配置</b></span><span><small>回复方式</small><b id="runtime-mode">填写草稿</b></span></div></div><div class="runtime-actions"><button class="button primary" data-command="start" id="start"><i data-lucide="play"></i>开始接待</button><div><button class="button secondary" data-command="pause" id="pause"><i data-lucide="pause"></i>暂停</button><button class="button quiet" data-command="stop" id="stop"><i data-lucide="square"></i>停止</button></div><small>停止时同步关闭接待浏览器</small></div></article>
+        <div class="page-heading"><div><p class="eyebrow">SERVICE WORKSPACE</p><h1>运行总览</h1><p>掌握接待进度，随时与同事协同。</p></div></div>
+        <div class="stats"><article class="stat"><span class="stat-icon"><i data-lucide="messages-square"></i></span><span>已同步客户</span><strong id="stat-conversations">0</strong><small>按店铺独立保存</small></article><article class="stat"><span class="stat-icon"><i data-lucide="send"></i></span><span>已确认发送</span><strong id="stat-sent">0</strong><small>已在客户端中核对</small></article><article class="stat"><span class="stat-icon"><i data-lucide="file-pen-line"></i></span><span>回复草稿</span><strong id="stat-drafts">0</strong><small>已生成，等待发送</small></article><article class="stat"><span class="stat-icon"><i data-lucide="clipboard-list"></i></span><span>待同事处理</span><strong id="stat-tasks">0</strong><small>补充结果后继续接待</small></article></div>
+        <article class="runtime-card"><div class="runtime-main"><div class="runtime-title"><span class="runtime-symbol"><i data-lucide="radio"></i></span><div><span class="eyebrow">接待状态</span><h2 id="runtime-title">服务已就绪</h2></div><span class="badge" id="runtime-badge">未启动</span></div><p id="runtime-detail">配置接待方式后，即可开始读取客户消息。</p><div class="runtime-meta"><span><small>接入来源</small><b id="runtime-target">桌面客户端</b></span><span><small>当前模型</small><b id="runtime-model">待配置</b></span><span><small>回复方式</small><b id="runtime-mode">填写草稿</b></span></div></div><div class="runtime-actions"><button class="button primary" data-command="start" id="start"><i data-lucide="play"></i>开始接待</button><div><button class="button secondary" data-command="pause" id="pause"><i data-lucide="pause"></i>暂停</button><button class="button quiet" data-command="stop" id="stop"><i data-lucide="square"></i>停止</button></div><small>停止时同步关闭客户端连接</small></div></article>
         <div class="overview-grid"><article class="panel"><div class="panel-heading"><h2>回复处理</h2><span class="muted">最近 100 条</span></div><div id="outbox"></div></article><article class="panel"><div class="panel-heading"><h2>运行记录</h2><i data-lucide="activity"></i></div><div id="events"></div><div class="panel-note"><i data-lucide="database"></i><span>会话与处理进度保存在本机，重启后可继续。</span></div></article></div>
       </section>
       <section class="view" id="view-conversations" hidden>
         <div class="page-heading"><div><p class="eyebrow">CONVERSATIONS</p><h1>客户会话</h1><p>查看完整上下文，接管需要关注的咨询。</p></div></div>
-        <div class="conversation-layout panel"><aside id="conversation-list"></aside><section id="conversation-detail"><div class="empty"><i data-lucide="messages-square"></i><h3>选择一个客户</h3><p>开始接待后，网页中的客户与消息会同步到这里。</p></div></section></div>
+        <div class="conversation-layout panel"><aside id="conversation-list"></aside><section id="conversation-detail"><div class="empty"><i data-lucide="messages-square"></i><h3>选择一个客户</h3><p>开始接待后，客户端中的客户与消息会同步到这里。</p></div></section></div>
       </section>
       <section class="view" id="view-tasks" hidden>
         <div class="page-heading"><div><p class="eyebrow">TEAM INBOX</p><h1>同事待办</h1><p>查看已收集的需求，填写确认结果，让接待继续。</p></div><button class="button secondary" data-view="settings"><i data-lucide="bell"></i>通知设置</button></div>
@@ -55,17 +55,14 @@
         <form id="settings-form" class="settings-form">
         <article class="panel reception-settings"><div class="panel-heading"><h2>接待方式</h2><span class="muted">停止接待后可修改，下次开始时生效</span></div><div class="form">
           <div class="reception-choices">
-            <label class="setting-choice"><span class="eyebrow">01 · 接入来源</span><select name="transport"><option value="desktop">桌面客户端 · Linkr</option><option value="mock">模拟页面</option><option value="jingmai">真实页面 · 京东京麦</option></select><small id="source-description">通过 Radxa Linkr 读取桌面客户端截图并用 OCR 识别会话。</small></label>
-            <label class="setting-choice"><span class="eyebrow">02 · 回复方式</span><select name="mode"><option value="draft">填写草稿</option><option value="auto">自动发送</option></select><small id="mode-description">将回复填入客服网页输入框，不点击发送。</small></label>
+            <label class="setting-choice"><span class="eyebrow">01 · 接入来源</span><small id="source-description">桌面客户端 · Radxa Linkr（HDMI 截图 + USB HID），由 OCR 识别会话。</small></label>
+            <label class="setting-choice"><span class="eyebrow">02 · 回复方式</span><select name="mode"><option value="draft">填写草稿</option><option value="auto">自动发送</option></select><small id="mode-description">将回复粘贴到客户端输入框，不点击发送。</small></label>
           </div>
           <div class="reception-summary" id="reception-summary"></div>
-          <div class="form-row"><label>店铺标识<input name="shop" required placeholder="例如：radxa-jd"></label><label id="channel-choice">使用浏览器<select name="channel"><option value="msedge">Microsoft Edge</option><option value="chromium">Chromium</option><option value="chrome">Google Chrome</option></select></label></div>
-          <div id="linkr-fields" class="form-stack">
-            <div class="form-row"><label>Linkr 地址<input name="linkr_url" placeholder="留空使用 .env 或 http://linkr-usb.local"></label><label>Linkr Token<input name="linkr_token" type="password" autocomplete="new-password" placeholder="留空使用 .env 中的 LINKR_TOKEN"></label></div>
-            <label class="switch-label"><input name="allow_send" type="checkbox">允许自动点击发送（需先完成发送槽位标定）</label>
-          </div>
-          <label id="mock-address">模拟页面地址<input name="mock_url" type="url" required></label>
-          <label id="real-address">真实页面地址<input name="jd_url" type="url" required></label>
+          <label>店铺标识<input name="shop" required placeholder="例如：radxa-jd"></label>
+          <div class="form-row"><label>Linkr 地址<input name="linkr_url" placeholder="留空使用 .env 或 http://linkr-usb.local"></label><label>Linkr Token<input name="linkr_token" type="password" autocomplete="new-password" placeholder="留空使用 .env 中的 LINKR_TOKEN"></label></div>
+          <label class="switch-label"><input name="allow_send" type="checkbox">允许自动点击发送（需先完成发送槽位标定）</label>
+          <p class="help-note">槽位表位于 experiments/dongdong_slots.json；标定与自检使用 run.cmd observe-desktop。</p>
           <details class="reception-advanced"><summary>读取与消息合并</summary><div class="form-row thirds"><label>扫描间隔（秒）<input name="poll_seconds" type="number" min="1" max="60"></label><label>消息合并等待（秒）<input name="merge_seconds" type="number" min="0" max="20"></label><label>每轮客户上限<input name="max_sessions" type="number" min="1" max="500"></label></div></details>
         </div></article>
         <article class="panel"><div class="panel-heading"><h2>定制需求收集</h2></div><div class="form"><p class="muted">收集以下信息后，创建同事待办。已提供的信息不会重复询问。</p><div id="custom-fields" class="checkbox-grid"></div><div class="persona-note"><i data-lucide="user-round-check"></i><div><b>客服同事的沟通方式</b><p>自然、温和、简洁地处理业务。以“我”或“这边”自然回应，查询与通知结果以实际执行记录为准。</p></div></div></div></article>
@@ -87,22 +84,22 @@
       </section>
       <section class="view" id="view-data" hidden>
         <div class="page-heading"><div><p class="eyebrow">WORKSPACE DATA</p><h1>数据管理</h1><p>管理本机客户记录，导出工作空间并迁移到另一台设备。</p></div></div>
-        <p class="help-note">操作前请在运行总览停止接待，等待浏览器和模型请求结束，并在接待设置中断开飞书连接。</p>
+        <p class="help-note">操作前请在运行总览停止接待，等待客户端操作和模型请求结束，并在接待设置中断开飞书连接。</p>
         <div class="settings-layout">
           <article class="panel"><div class="panel-heading"><h2>导出与迁移</h2></div><div class="form">
-            <p>导出客户、聊天、草稿、待办、业务知识、接待配置及模拟记录。流程等待进度一并保存。</p>
-            <label><span><input type="checkbox" id="export-secrets"> 包含模型密钥和飞书凭据</span><small>默认不包含。勾选后的 ZIP 含明文凭据，请妥善保管；导出包始终包含客户资料。</small></label>
+            <p>导出客户、聊天、草稿、待办、业务知识及接待配置。流程等待进度一并保存。</p>
+            <label><span><input type="checkbox" id="export-secrets"> 包含模型密钥、Linkr Token 和飞书凭据</span><small>默认不包含。勾选后的 ZIP 含明文凭据，请妥善保管；导出包始终包含客户资料。</small></label>
             <button class="button primary" id="export-data">下载迁移包</button>
             <h3>在目标机器恢复</h3><p>安装项目后，将 ZIP 放到目标机器，在项目终端执行：</p>
             <code class="migration-command">.\run.cmd restore-data "迁移包.zip" --data-dir "artifacts\restored"</code>
             <p>目标目录必须尚不存在，恢复不会覆盖旧数据。随后执行：</p>
             <code class="migration-command">.\run.cmd serve --data-dir "artifacts\restored"</code>
-            <small>京麦需重新登录。浏览器登录、.env、原始 CSV 和代码不包含在迁移包中；已导入的知识完整保留。单包上限 512 MB。</small>
+            <small>客户端登录状态、.env、原始 CSV 和代码不包含在迁移包中；已导入的知识完整保留。单包上限 512 MB。</small>
           </div></article>
           <article class="panel"><div class="panel-heading"><h2>清理客户数据</h2></div><div class="form">
             <p>单个客户的清空聊天、删除入口位于“客户会话”详情。</p>
             <button class="button secondary" data-view="conversations">查看客户会话</button>
-            <hr><h3>删除全部客户与聊天</h3><p>删除本地所有客户、聊天、草稿、待办、流程记忆及模拟客户，保留知识、模型连接和接待配置。不会删除京麦服务器上的记录。</p>
+            <hr><h3>删除全部客户与聊天</h3><p>删除本地所有客户、聊天、草稿、待办和流程记忆，保留知识、模型连接和接待配置。不会删除客户端中的聊天记录。</p>
             <button class="button danger" data-delete="delete_all">删除全部客户与聊天</button>
           </div></article>
         </div>

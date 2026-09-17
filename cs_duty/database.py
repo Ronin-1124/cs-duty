@@ -1,4 +1,4 @@
-"""Business records are separate from LangGraph checkpoints and browser fixtures."""
+"""Business records are separate from LangGraph checkpoints and client captures."""
 from __future__ import annotations
 
 import hashlib
@@ -77,7 +77,7 @@ class Database:
         columns = {row[1] for row in self.conn.execute('PRAGMA table_info(outbox)')}
         if 'sent_source_id' not in columns:
             self.conn.execute("ALTER TABLE outbox ADD COLUMN sent_source_id TEXT DEFAULT ''")
-        self.conn.execute("UPDATE outbox SET status='uncertain', reason='上次运行在发送确认前中断，请核对网页记录' WHERE status='sending'")
+        self.conn.execute("UPDATE outbox SET status='uncertain', reason='上次运行在发送确认前中断，请核对客户端记录' WHERE status='sending'")
         self.conn.execute("UPDATE tasks SET notification='uncertain' WHERE notification='sending'")
         self.conn.commit()
 

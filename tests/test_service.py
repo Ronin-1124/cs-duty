@@ -33,7 +33,7 @@ class ServiceCase(unittest.TestCase):
         self.settings.save_profile(self.profile)
         self.knowledge = Knowledge(self.db)
         self.knowledge.import_csv('test.csv', '产品型号,问题,答案\nTEST-1,TEST-1供电电压是多少,TEST-1使用5V供电\n')
-        self.cid, _ = self.db.ingest('mock', 'shop', 'customer-1', '客户甲',
+        self.cid, _ = self.db.ingest('desktop', 'shop', 'customer-1', '客户甲',
                                     [{'id': 'm1', 'role': 'customer', 'text': 'TEST-1供电电压是多少'}])
         self.checkpoints = sqlite3.connect(self.root / 'checkpoints.sqlite3', check_same_thread=False)
         self.addCleanup(self.temp.cleanup)
@@ -66,14 +66,14 @@ class ServiceCase(unittest.TestCase):
     def test_deduplication_staleness_and_customer_isolation(self):
         oid = self.db.prepare_reply(self.cid, 'm1', '回复', 'ready')
         self.assertEqual(oid, self.db.prepare_reply(self.cid, 'm1', '重复', 'ready'))
-        same, changed = self.db.ingest('mock', 'shop', 'customer-1', '客户甲',
+        same, changed = self.db.ingest('desktop', 'shop', 'customer-1', '客户甲',
                                        [{'id': 'm1', 'role': 'customer', 'text': 'TEST-1供电电压是多少'}])
         self.assertFalse(changed)
         self.assertEqual(same, self.cid)
-        other, _ = self.db.ingest('mock', 'other-shop', 'customer-1', '客户甲',
+        other, _ = self.db.ingest('desktop', 'other-shop', 'customer-1', '客户甲',
                                   [{'id': 'm1', 'role': 'customer', 'text': '另外的问题'}])
         self.assertNotEqual(other, self.cid)
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [{'id': 'm2', 'role': 'customer', 'text': '补充问题'}])
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [{'id': 'm2', 'role': 'customer', 'text': '补充问题'}])
         self.assertEqual(self.db.one('SELECT status FROM outbox WHERE id=?', (oid,))['status'], 'stale')
         self.assertIsNone(self.db.prepare_reply(self.cid, 'm1', '过期回复', 'ready'))
 
@@ -124,7 +124,7 @@ class ServiceCase(unittest.TestCase):
         self.assertEqual(self.db.rows('SELECT * FROM outbox'), [])
 
     def test_greetings_and_nudges_do_not_require_model_or_knowledge(self):
-        self.cid, _ = self.db.ingest('mock', 'shop', 'greeting', 'a', [
+        self.cid, _ = self.db.ingest('desktop', 'shop', 'greeting', 'a', [
             {'id': 'g1', 'role': 'customer', 'text': '你好'},
             {'id': 'g2', 'role': 'customer', 'text': '客服在吗'},
             {'id': 'g3', 'role': 'customer', 'text': '？？？'},
@@ -143,7 +143,7 @@ class ServiceCase(unittest.TestCase):
 
     def test_greeting_keeps_custom_collection_state(self):
         self.db.set_state(self.cid, 'collecting', {'product': 'TEST-1'})
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'a1', 'role': 'agent', 'text': '请提供定制数量'},
             {'id': 'm2', 'role': 'customer', 'text': '还在吗？'},
         ])
@@ -153,7 +153,7 @@ class ServiceCase(unittest.TestCase):
         self.assertEqual(current['fields'], {'product': 'TEST-1'})
 
     def test_nudge_does_not_hide_unanswered_product_question(self):
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'm2', 'role': 'customer', 'text': '客服在吗？'},
         ])
         self.graph().invoke(self.value(), self.config)
@@ -167,7 +167,7 @@ class ServiceCase(unittest.TestCase):
         self.assertEqual(graph.get_state(self.config).next, ('wait_colleague',))
         self.db.execute("UPDATE tasks SET status='cancelled'")
         self.db.set_state(self.cid, 'active')
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'm2', 'role': 'customer', 'text': '想问声好'},
         ])
         # Fresh input replaces the cancelled interrupt without deleting checkpoints.
@@ -186,7 +186,7 @@ class ServiceCase(unittest.TestCase):
         self.assertEqual(self.db.rows('SELECT * FROM tasks'), [])
         fields = {'product': 'TEST-1', 'requirements': '定制外壳', 'quantity': '100台',
                   'deadline': '下月', 'contact': '电话123'}
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [{'id': 'm2', 'role': 'customer', 'text': '请同事确认'}])
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [{'id': 'm2', 'role': 'customer', 'text': '请同事确认'}])
         graph = self.graph('custom', fields)
         graph.invoke(self.value(), self.config)
         task = self.db.one('SELECT * FROM tasks')
@@ -209,7 +209,7 @@ class ServiceCase(unittest.TestCase):
         graph = self.graph('offtopic')
         graph.invoke(self.value(), self.config)
         reply = self.db.one('SELECT reply FROM outbox')['reply']
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'a1', 'role': 'agent', 'text': reply}, {'id': 'm2', 'role': 'customer', 'text': '给我写篇作文'}])
         graph.invoke(self.value(), self.config)
         self.assertEqual(self.db.one("SELECT status FROM outbox WHERE source_id='m2'")['status'], 'ignored')
@@ -221,25 +221,25 @@ class ServiceCase(unittest.TestCase):
 
     def test_first_thanks_replies_once_and_new_question_is_not_swallowed(self):
         courtesy = '客气了，有需要随时联系我。'
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'a1', 'role': 'agent', 'text': '这款使用5V供电。'},
             {'id': 'm2', 'role': 'customer', 'text': '好的，谢谢客服'},
         ])
         graph = self.graph(callback=lambda context: self.fail('简单致谢不调用模型'))
         graph.invoke(self.value(), self.config)
         self.assertEqual(self.db.one("SELECT reply FROM outbox WHERE source_id='m2'")['reply'], courtesy)
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'a2', 'role': 'agent', 'text': courtesy},
             {'id': 'm3', 'role': 'customer', 'text': '谢谢您！'},
         ])
         graph.invoke(self.value(), self.config)
         self.assertEqual(self.db.one("SELECT status FROM outbox WHERE source_id='m3'")['status'], 'ignored')
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'm4', 'role': 'customer', 'text': '谢谢，TEST-1供电电压是多少？'},
         ])
         self.graph().invoke(self.value(), self.config)
         self.assertIn('5V', self.db.one("SELECT reply FROM outbox WHERE source_id='m4'")['reply'])
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'a4', 'role': 'agent', 'text': '使用5V供电。'},
             {'id': 'm5', 'role': 'customer', 'text': '谢谢'},
         ])
@@ -254,14 +254,14 @@ class ServiceCase(unittest.TestCase):
         reply = self.db.one('SELECT reply FROM outbox')['reply']
         self.assertIn('数量', reply)
         self.assertNotIn('产品型号', reply)
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'a1', 'role': 'agent', 'text': reply},
             {'id': 'm2', 'role': 'customer', 'text': '谢谢'},
         ])
         graph.invoke(self.value(), self.config)
         self.assertEqual(self.db.conversation(self.cid)['state'], 'collecting')
         self.assertEqual(graph.get_state(self.config).values['collection_intent'], 'quote')
-        self.db.ingest('mock', 'shop', 'customer-1', '客户甲', [
+        self.db.ingest('desktop', 'shop', 'customer-1', '客户甲', [
             {'id': 'm3', 'role': 'customer', 'text': '100台，在这里联系'},
         ])
         def complete(context):
@@ -299,7 +299,7 @@ class ServiceCase(unittest.TestCase):
                 self.assertEqual(result['reply'], expected)
                 self.assertEqual(result['action'], 'reply')
 
-    def test_cancel_during_browser_preparation_is_not_restored_to_draft(self):
+    def test_cancel_during_client_preparation_is_not_restored_to_draft(self):
         oid = self.db.prepare_reply(self.cid, 'm1', '回复', 'ready')
         runtime = Runtime(self.db, self.settings, self.knowledge)
         runtime.state = 'running'

@@ -1,4 +1,4 @@
-"""One owned browser worker, bounded model workers, and durable per-customer jobs."""
+"""One owned desktop client worker, bounded model workers, and durable per-customer jobs."""
 from __future__ import annotations
 
 import concurrent.futures
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
-from cs_duty.browser import BrowserAdapter
+from cs_duty.desktop.adapter import DesktopAdapter
 from cs_duty.models import ModelClient, ModelError
 from cs_duty.transport import TransportNotReady, comparable_text
 from cs_duty.notifications import notify_task
@@ -18,7 +18,7 @@ from cs_duty.workflow import Workflow
 
 
 class Runtime:
-    def __init__(self, db, settings, knowledge, adapter_factory=BrowserAdapter, model_factory=ModelClient):
+    def __init__(self, db, settings, knowledge, adapter_factory=DesktopAdapter, model_factory=ModelClient):
         self.db, self.settings, self.knowledge = db, settings, knowledge
         self.adapter_factory, self.model_factory = adapter_factory, model_factory
         self.lock = threading.RLock()
@@ -46,9 +46,9 @@ class Runtime:
             self.settings.profile()
             self.stop_event.clear()
             self.generation += 1
-            self.state, self.detail = 'starting', '正在启动浏览器'
-            self.db.event('runtime', '开始接待，正在连接网页')
-            self.thread = threading.Thread(target=self._run, name='cs-duty-browser', daemon=False)
+            self.state, self.detail = 'starting', '正在启动客户端连接'
+            self.db.event('runtime', '开始接待，正在连接桌面客户端')
+            self.thread = threading.Thread(target=self._run, name='cs-duty-client', daemon=False)
             self.thread.start()
 
     def pause(self):
@@ -63,7 +63,7 @@ class Runtime:
             self.stop_event.set()
             self.generation += 1
             if self.thread and self.thread.is_alive():
-                self.state, self.detail = 'stopping', '正在结束请求并关闭浏览器'
+                self.state, self.detail = 'stopping', '正在结束请求并关闭客户端连接'
             thread = self.thread
         if wait and thread:
             thread.join()
@@ -85,7 +85,7 @@ class Runtime:
             adapter.start()
             with self.lock:
                 if not self.stop_event.is_set():
-                    self.state, self.detail = 'running', '正在通过网页读取消息'
+                    self.state, self.detail = 'running', '正在通过客户端读取消息'
             while not self.stop_event.is_set():
                 for cid, job in list(pending.items()):
                     future, task_id = job
@@ -119,22 +119,22 @@ class Runtime:
                     with self.lock:
                         if self.state != 'paused':
                             state = 'waiting_login' if isinstance(exc, TransportNotReady) else 'error'
-                            detail = str(exc) if isinstance(exc, TransportNotReady) else f'客服列表读取失败（{type(exc).__name__}），请检查页面遮挡或页面结构变化'
+                            detail = str(exc) if isinstance(exc, TransportNotReady) else f'会话列表读取失败（{type(exc).__name__}），请检查客户端窗口是否被遮挡'
                             if (self.state, self.detail) != (state, detail):
-                                self.db.event('browser', detail)
+                                self.db.event('client', detail)
                             self.state, self.detail = state, detail
                     self.stop_event.wait(2)
                     continue
                 with self.lock:
                     if self.state in ('waiting_login', 'error'):
-                        self.state, self.detail = 'running', '客服页面已连接'
+                        self.state, self.detail = 'running', '客户端已连接'
                 for customer in customers:
                     if self.stop_event.is_set() or self.state == 'paused':
                         break
                     try:
                         prior = self.db.one('SELECT * FROM conversations WHERE platform=? AND shop=? AND customer_key=?',
                             (config['transport'], config['shop'], customer['customer_key']))
-                        initial = config['transport'] != 'mock' and customer.get('initial_history', False) and customer['customer_key'] not in baselined
+                        initial = customer.get('initial_history', False) and customer['customer_key'] not in baselined
                         ready_task = prior and self.db.one("SELECT id FROM tasks WHERE conversation_id=? AND status='ready' LIMIT 1", (prior['id'],))
                         needs_plan = prior and prior['latest_id'] != prior['handled_id'] and prior['state'] in ('active', 'collecting') and prior['retry_after'] <= time.time() and prior['id'] not in pending
                         if hasattr(adapter, 'should_read') and not adapter.should_read(customer, force=bool(initial or ready_task or needs_plan)):
@@ -187,7 +187,7 @@ class Runtime:
                             value = self._input(current, leave_message=leave_message)
                         pending[cid] = (pool.submit(graph.invoke, value, thread_config), '')
                     except Exception:
-                        self.db.event('browser', '一个会话读取未完成，将在下一轮重新检查')
+                        self.db.event('client', '一个会话读取未完成，将在下一轮重新检查')
                 if self.state == 'running' and not self.stop_event.is_set():
                     if config['mode'] == 'draft':
                         self._fill_drafts(adapter)
@@ -197,10 +197,11 @@ class Runtime:
                             break
                         self.notify(task)
                 self.stop_event.wait(config['poll_seconds'])
-        except Exception:
+        except Exception as exc:
             fatal_error = True
             with self.lock:
-                self.state, self.detail = 'error', '浏览器启动失败；请检查浏览器安装、配置目录或端口'
+                self.state = 'error'
+                self.detail = str(exc) if isinstance(exc, TransportNotReady) else f'客户端连接失败（{type(exc).__name__}），请检查 Linkr 连接与客户端窗口'
             self.db.event('error', self.detail)
         finally:
             try:
@@ -210,7 +211,7 @@ class Runtime:
                 checkpoint_conn.close()
                 with self.lock:
                     if not fatal_error:
-                        self.state, self.detail = 'stopped', '已停止，浏览器已关闭'
+                        self.state, self.detail = 'stopped', '已停止，客户端连接已关闭'
                         self.db.event('runtime', self.detail)
 
     def _input(self, conversation, employee_result='', leave_message=False):
@@ -231,7 +232,7 @@ class Runtime:
             pending = self.db.rows("SELECT id,reply FROM outbox WHERE conversation_id=? AND status IN ('draft','ready')", (cid,))
             match = next((row for row in pending if comparable_text(row['reply']) == comparable_text(msg['text'])), None)
             if match:
-                self.db.execute("UPDATE outbox SET status='sent',sent_source_id=?,reason='同事在网页手动发送',updated=? WHERE id=?",
+                self.db.execute("UPDATE outbox SET status='sent',sent_source_id=?,reason='同事在客户端手动发送',updated=? WHERE id=?",
                                 (msg['id'], time.time(), match['id']))
                 self.drafted.pop(match['id'], None)
                 continue
@@ -293,7 +294,7 @@ class Runtime:
             try:
                 status, reason = adapter.fill_draft(item['name'], item['source_id'], item['reply'], before_fill, item['customer_key'])
             except Exception:
-                status, reason = 'draft', '网页草稿填入未完成，请检查页面；重新开始接待可重试'
+                status, reason = 'draft', '客户端草稿填入未完成，请检查客户端；重新开始接待可重试'
             with self.db.lock:
                 current = self.db.one('SELECT status,reply FROM outbox WHERE id=?', (item['id'],))
                 if current and current['status'] == 'draft' and current['reply'] == item['reply']:
@@ -324,7 +325,7 @@ class Runtime:
             except Exception:
                 old = self.db.one('SELECT status FROM outbox WHERE id=?', (item['id'],))
                 status = 'uncertain' if old['status'] == 'sending' else 'draft'
-                reason = '网页操作中断，请核对会话后处理'
+                reason = '客户端操作中断，请核对会话后处理'
             with self.db.lock:
                 existing = self.db.one('SELECT status FROM outbox WHERE id=?', (item['id'],))
                 if existing['status'] not in ('ready', 'sending'):

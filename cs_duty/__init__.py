@@ -1,3 +1,3 @@
-"""Local customer-service application: browser transport and durable workflows."""
+"""Local customer-service application: desktop client transport and durable workflows."""
 
 VERSION = "1.0.0"

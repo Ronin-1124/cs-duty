@@ -228,12 +228,10 @@ class DesktopSettingsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Linkr 地址'):
             self.settings.save_runtime({'transport': 'desktop', 'linkr_url': 'not-a-url'})
 
-    def test_default_adapter_factory_selects_by_transport(self):
+    def test_default_adapter_factory_builds_the_desktop_adapter(self):
         from cs_duty.server import default_adapter_factory
-        desktop = default_adapter_factory({'transport': 'desktop'}, ROOT)
-        self.assertEqual(type(desktop).__name__, 'DesktopAdapter')
-        browser = default_adapter_factory({'transport': 'mock'}, ROOT)
-        self.assertEqual(type(browser).__name__, 'BrowserAdapter')
+        adapter = default_adapter_factory({'transport': 'desktop'}, ROOT)
+        self.assertEqual(type(adapter).__name__, 'DesktopAdapter')
 
 
 if __name__ == '__main__':

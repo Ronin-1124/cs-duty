@@ -1,4 +1,4 @@
-"""Loopback management API and static pages, sharing the fixture service."""
+"""Loopback management API and static pages for the desktop client workspace."""
 from __future__ import annotations
 
 import hashlib
@@ -8,7 +8,7 @@ import os
 import signal
 import socket
 import time
-from http.server import ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -18,29 +18,20 @@ from cs_duty.knowledge import Knowledge, RAW_CSV_SOURCES
 from cs_duty.models import ModelClient, ModelError
 from cs_duty.runtime import Runtime
 from cs_duty.settings import Settings
-from mock_dongdong.server import Handler as MockHandler
-from mock_dongdong.store import Store
 
 WEB = Path(__file__).resolve().parent / 'web'
 
 
 def default_adapter_factory(config, data_dir):
-    if config.get('transport') == 'desktop':
-        from cs_duty.desktop.adapter import DesktopAdapter
-        return DesktopAdapter(config, data_dir)
-    from cs_duty.browser import BrowserAdapter
-    return BrowserAdapter(config, data_dir)
+    from cs_duty.desktop.adapter import DesktopAdapter
+    return DesktopAdapter(config, data_dir)
 
 
 class Application:
     def __init__(self, data_dir, base_url, env_path=ROOT / '.env', import_root=ROOT, model_factory=ModelClient, adapter_factory=None):
         self.db = Database(data_dir / 'business.sqlite3')
         self.settings = Settings(self.db, env_path)
-        config = self.settings.runtime()
-        if config['mock_url'] == 'http://127.0.0.1:18766/workbench':
-            self.settings.save_runtime({'mock_url': base_url + '/workbench'})
         self.knowledge = Knowledge(self.db)
-        self.fixture = Store(data_dir / 'mock.json')
         self.model_factory = model_factory
         self.runtime = Runtime(self.db, self.settings, self.knowledge,
                                adapter_factory=adapter_factory or default_adapter_factory,
@@ -92,7 +83,7 @@ class Application:
         self.db.close()
 
 
-class Handler(MockHandler):
+class Handler(BaseHTTPRequestHandler):
     app: Application
 
     def log_message(self, fmt, *args):
@@ -149,14 +140,14 @@ class Handler(MockHandler):
                     return self._json(404, {'error': '页面不存在'})
                 mime = mimetypes.guess_type(target.name)[0] or 'application/octet-stream'
                 return self._respond(200, target.read_bytes(), mime + '; charset=utf-8')
-            return super().do_GET()
+            return self._json(404, {'error': '页面不存在'})
         except ValueError as exc:
             return self._json(400, {'error': str(exc)})
 
     def do_POST(self):
         path = urlparse(self.path).path
         if not path.startswith('/api/manage/'):
-            return super().do_POST()
+            return self._json(404, {'error': '页面不存在'})
         expected = 'http://' + self.headers.get('Host', '')
         if self.headers.get('Origin') not in (None, expected) or self.headers.get('X-CS-Duty') != '1':
             return self._json(403, {'error': '请从本机管理页面操作'})
@@ -309,7 +300,7 @@ def create_server(host='127.0.0.1', port=18766, data_dir=None, **kwargs):
     except Exception:
         server.server_close()
         raise
-    handler.app, handler.store = app, app.fixture
+    handler.app = app
     return server, app
 
 
@@ -326,9 +317,7 @@ def serve(host='127.0.0.1', port=18766, data_dir=None):
         print(f'端口 {port} 已被占用，未启动第二个实例。请停止原服务或使用 --port 指定其他端口。', flush=True)
         return 1
     print(f'客服管理：http://127.0.0.1:{port}/manage', flush=True)
-    print(f'模拟工作台：http://127.0.0.1:{port}/workbench', flush=True)
-    print(f'客户控制台：http://127.0.0.1:{port}/control', flush=True)
-    print('按 Ctrl+C 停止整个应用及其浏览器。', flush=True)
+    print('按 Ctrl+C 停止整个应用及其客户端连接。', flush=True)
     try:
         server.serve_forever(poll_interval=.2)
     except KeyboardInterrupt:

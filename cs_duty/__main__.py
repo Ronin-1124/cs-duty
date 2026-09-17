@@ -26,7 +26,7 @@ def main(argv=None):
         print('启动：.\\run.cmd serve --data-dir "' + result['directory'] + '"')
         if not result['includes_secrets']:
             print('请在管理页重新填写模型密钥和飞书通知配置。')
-        print('京麦浏览器需要重新登录。')
+        print('请在客户端重新登录，并确认 Linkr 连接正常。')
         return 0
     if argv and argv[0] == 'import-knowledge':
         parser = argparse.ArgumentParser(description='导入整理后的 Radxa 知识包（请先停止服务）')
@@ -80,25 +80,6 @@ def main(argv=None):
         finally:
             db.close()
         return 0
-    if argv and argv[0] == 'observe-jingmai':
-        parser = argparse.ArgumentParser(description='只读采集京东咚咚工作台与客服助手结构（不保存客户正文；需先停止服务）')
-        parser.add_argument('--data-dir', default='artifacts/app')
-        parser.add_argument('--out', default=None)
-        parser.add_argument('--no-wait', action='store_true', help='不等待手动打开会话')
-        args = parser.parse_args(argv[1:])
-        from pathlib import Path
-        from cs_duty.database import Database
-        from cs_duty.settings import Settings
-        from cs_duty.observe import capture
-        data_dir = Path(args.data_dir)
-        db = Database(data_dir / 'business.sqlite3')
-        try:
-            target = capture(Settings(db, None).runtime(), data_dir, args.out, wait=not args.no_wait)
-        finally:
-            db.close()
-        print('采集完成：' + target)
-        print('请确认文件不含需要保密的客户信息后再外发。')
-        return 0
     if argv and argv[0] == 'observe-desktop':
         parser = argparse.ArgumentParser(description='只读采集桌面客户端截图与 OCR 结果（需先停止服务；含客户端文字，请勿外发）')
         parser.add_argument('--data-dir', default='artifacts/app')
@@ -118,10 +99,7 @@ def main(argv=None):
         print('采集完成：' + target)
         print('产物包含客户端文字，请确认不含需要保密的客户信息后再外发。')
         return 0
-    if argv and argv[0] not in ('serve', '-h', '--help'):
-        from mock_dongdong.cli import main as replica_cli
-        return replica_cli(argv)
-    parser = argparse.ArgumentParser(description='本地客服应用：管理页面、LangGraph 流程与网页自动化')
+    parser = argparse.ArgumentParser(description='本地客服应用：管理页面、LangGraph 流程与桌面客户端接入')
     parser.add_argument('command', nargs='?', default='serve', choices=['serve'])
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=18766)

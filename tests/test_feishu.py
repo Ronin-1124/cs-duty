@@ -30,7 +30,7 @@ class FeishuCase(unittest.TestCase):
         self.bridge = FeishuBridge(self.db, self.settings, lambda config: self.api)
         self.addCleanup(self.bridge.stop)
         self.bridge.api, self.bridge.bot, self.bridge.state = self.api, 'ou_bot', 'connected'
-        cid, _ = self.db.ingest('mock', 'shop', 'fixture', '测试客户',
+        cid, _ = self.db.ingest('desktop', 'shop', 'fixture', '测试客户',
             [{'id': 'm1', 'role': 'customer', 'text': '请确认交期'}])
         self.tid = self.db.create_task(cid, 'm1', '确认交期', {'product': 'TEST'})
 

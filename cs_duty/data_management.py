@@ -12,13 +12,14 @@ from pathlib import Path
 
 from cs_duty.knowledge import terms
 
-FILES = {'business.sqlite3', 'checkpoints.sqlite3', 'mock.json'}
+FILES = {'business.sqlite3', 'checkpoints.sqlite3'}
+LEGACY_FILES = {'mock.json'}
 MAX_BYTES = 512 * 1024 * 1024
 
 
 def require_stopped(app):
     if app.runtime.status()['running']:
-        raise ValueError('请先停止接待，并等待浏览器及模型请求结束；暂停不等于停止')
+        raise ValueError('请先停止接待，并等待客户端操作及模型请求结束；暂停不等于停止')
     if getattr(app, 'feishu', None) and app.feishu.status()['running']:
         raise ValueError('请先断开飞书连接，再清理或导出数据')
 
@@ -27,8 +28,8 @@ def delete_conversations(app, cid=None, *, keep_customer=False, all_customers=Fa
     if not all_customers and not isinstance(cid, str):
         raise ValueError('请选择客户')
     db = app.db
-    # Prevent start racing the stopped check; mock requests use the same store lock.
-    with app.runtime.lock, app.feishu.lock, db.lock, app.fixture._lock:
+    # Prevent start racing the stopped check.
+    with app.runtime.lock, app.feishu.lock, db.lock:
         require_stopped(app)
         customers = db.rows('SELECT * FROM conversations') if all_customers else [db.conversation(cid)]
         checkpoint = db.path.parent / 'checkpoints.sqlite3'
@@ -60,15 +61,6 @@ def delete_conversations(app, cid=None, *, keep_customer=False, all_customers=Fa
                     db.conn.execute('DELETE FROM deleted_messages')
                     for table in checkpoint_tables & {'checkpoints', 'writes'}:
                         db.conn.execute(f'DELETE FROM cleanup.{table}')
-                fixture = app.fixture._read()
-                names = {c['name'] for c in customers if c['platform'] == 'mock'}
-                for session in list(fixture['sessions']):
-                    if all_customers or session['buyer_id'] in names:
-                        if keep_customer:
-                            session.update(messages=[], requests={}, unread=0, preview='', time='', in_consult=False)
-                        else:
-                            fixture['sessions'].remove(session)
-                app.fixture._write(fixture)
         finally:
             if attached:
                 db.conn.execute('DETACH DATABASE cleanup')
@@ -78,7 +70,7 @@ def delete_conversations(app, cid=None, *, keep_customer=False, all_customers=Fa
 def export_workspace(app, include_secrets=False):
     if not isinstance(include_secrets, bool):
         raise ValueError('密钥选项必须为布尔值')
-    with app.runtime.lock, app.feishu.lock, app.db.lock, app.fixture._lock, tempfile.TemporaryDirectory() as temp:
+    with app.runtime.lock, app.feishu.lock, app.db.lock, tempfile.TemporaryDirectory() as temp:
         require_stopped(app)
         root = Path(temp)
         business = root / 'business.sqlite3'
@@ -93,13 +85,13 @@ def export_workspace(app, include_secrets=False):
                 row = conn.execute("SELECT value FROM settings WHERE key='runtime'").fetchone()
                 if row:
                     settings = json.loads(row[0])
-                    settings.update(feishu_webhook='', feishu_secret='', feishu_app_secret='', feishu_enabled=False)
+                    settings.update(feishu_webhook='', feishu_secret='', feishu_app_secret='', feishu_enabled=False, linkr_token='')
                     conn.execute("UPDATE settings SET value=? WHERE key='runtime'", (json.dumps(settings, ensure_ascii=False),))
             conn.commit()
             conn.execute('VACUUM')
         finally:
             conn.close()
-        payload = {'business.sqlite3': business.read_bytes(), 'mock.json': app.fixture.path.read_bytes()}
+        payload = {'business.sqlite3': business.read_bytes()}
         checkpoint = app.db.path.parent / 'checkpoints.sqlite3'
         if checkpoint.exists():
             source = sqlite3.connect(checkpoint.resolve().as_uri() + '?mode=ro', uri=True)
@@ -110,7 +102,7 @@ def export_workspace(app, include_secrets=False):
                 source.close()
                 target.close()
             payload['checkpoints.sqlite3'] = (root / 'checkpoints.sqlite3').read_bytes()
-        manifest = {'format': 'cs-duty-workspace', 'version': 1,
+        manifest = {'format': 'cs-duty-workspace', 'version': 2,
                     'created': datetime.now(timezone.utc).isoformat(), 'includes_secrets': include_secrets,
                     'files': {name: hashlib.sha256(data).hexdigest() for name, data in payload.items()}}
         if sum(map(len, payload.values())) > MAX_BYTES - 4096:
@@ -135,16 +127,18 @@ def restore_workspace(archive_path, target_dir):
         try:
             with zipfile.ZipFile(archive_path) as archive:
                 names = archive.namelist()
-                if len(names) != len(set(names)) or not set(names) <= FILES | {'manifest.json'}:
+                if len(names) != len(set(names)) or not set(names) <= FILES | LEGACY_FILES | {'manifest.json'}:
                     raise ValueError('迁移包包含重复或未知文件')
                 if sum(f.file_size for f in archive.infolist()) > MAX_BYTES:
                     raise ValueError('迁移包解压后不能超过 512 MB')
                 manifest = json.loads(archive.read('manifest.json'))
                 if not isinstance(manifest, dict) or not isinstance(manifest.get('files'), dict) or not isinstance(manifest.get('includes_secrets'), bool):
                     raise ValueError('迁移包清单格式错误')
-                if manifest.get('format') not in ('cs-duty-workspace', 'cs-rpa-workspace') or manifest.get('version') != 1:
+                version = manifest.get('version')
+                if manifest.get('format') not in ('cs-duty-workspace', 'cs-rpa-workspace') or version not in (1, 2):
                     raise ValueError('不支持的迁移包版本')
-                if set(manifest['files']) != set(names) - {'manifest.json'} or not {'business.sqlite3', 'mock.json'} <= set(names):
+                required = {'business.sqlite3', 'mock.json'} if version == 1 else {'business.sqlite3'}
+                if set(manifest['files']) != set(names) - {'manifest.json'} or not required <= set(names):
                     raise ValueError('迁移包文件清单不完整')
                 for name, digest in manifest['files'].items():
                     data = archive.read(name)
@@ -165,14 +159,11 @@ def restore_workspace(archive_path, target_dir):
                     row = conn.execute("SELECT value FROM settings WHERE key='runtime'").fetchone()
                     if row:
                         settings = json.loads(row[0])
-                        # Application maps this default to the destination server port.
-                        settings['mock_url'] = 'http://127.0.0.1:18766/workbench'
+                        for key in ('transport', 'mock_url', 'jd_url', 'channel'):
+                            settings.pop(key, None)
                         conn.execute("UPDATE settings SET value=? WHERE key='runtime'", (json.dumps(settings, ensure_ascii=False),))
                         conn.commit()
             finally:
                 conn.close()
-        mock = json.loads((stage / 'mock.json').read_text(encoding='utf-8'))
-        if not isinstance(mock, dict) or not isinstance(mock.get('sessions'), list) or not isinstance(mock.get('rev'), int):
-            raise ValueError('模拟记录格式错误')
         stage.rename(target_dir)
     return {'directory': str(target_dir), 'includes_secrets': manifest['includes_secrets']}

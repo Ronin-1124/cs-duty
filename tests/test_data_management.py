@@ -1,3 +1,4 @@
+import hashlib
 import io
 from contextlib import closing
 import json
@@ -24,15 +25,15 @@ class DataManagementCase(unittest.TestCase):
         self.addCleanup(self.app.close)
         self.db = self.app.db
         self.old = {'id': 'old', 'role': 'customer', 'text': 'private-old-text'}
-        self.cid, _ = self.db.ingest('jingmai', 'test', 'buyer', '测试客户', [self.old])
-        self.other, _ = self.db.ingest('jingmai', 'test', 'other', '保留客户', [{'id': 'other-old', 'role': 'customer', 'text': '保留消息'}])
+        self.cid, _ = self.db.ingest('desktop', 'test', 'buyer', '测试客户', [self.old])
+        self.other, _ = self.db.ingest('desktop', 'test', 'other', '保留客户', [{'id': 'other-old', 'role': 'customer', 'text': '保留消息'}])
         self.db.prepare_reply(self.cid, 'old', '草稿', 'draft')
         tid = self.db.create_task(self.cid, 'old', '待确认', {'product': 'TEST'})
         self.db.execute('INSERT INTO feishu_task_messages VALUES(?,?,?,?)', (tid, 'om_task', 'oc_group', 'cli_fixture'))
         self.db.execute('INSERT INTO feishu_receipts VALUES(?,?,?,?,?)', ('om_result', tid, 'ou_owner', 'oc_group', 1))
         self.app.knowledge.import_csv('test.csv', '问题,答案\n供电,5V\n')
         self.pid = self.app.settings.save_profile({'name': 'fixture', 'protocol': 'openai', 'model': 'fixture', 'base_url': 'https://example.com/v1', 'api_key': 'secret-test-unique-key'})
-        self.app.settings.save_runtime({'feishu_webhook': 'https://open.feishu.cn/open-apis/bot/v2/hook/secret-hook', 'feishu_secret': 'secret-signature', 'feishu_enabled': True, 'feishu_app_secret': 'secret-feishu-app'})
+        self.app.settings.save_runtime({'feishu_webhook': 'https://open.feishu.cn/open-apis/bot/v2/hook/secret-hook', 'feishu_secret': 'secret-signature', 'feishu_enabled': True, 'feishu_app_secret': 'secret-feishu-app', 'linkr_token': 'secret-linkr-token'})
         with closing(sqlite3.connect(self.root / 'source' / 'checkpoints.sqlite3', check_same_thread=False)) as conn, conn:
             SqliteSaver(conn).setup()
             for cid in (self.cid, self.other):
@@ -50,9 +51,9 @@ class DataManagementCase(unittest.TestCase):
         with closing(sqlite3.connect(self.root / 'source' / 'checkpoints.sqlite3', check_same_thread=False)) as conn, conn:
             self.assertEqual(conn.execute('SELECT thread_id FROM checkpoints').fetchall(), [(self.other,)])
             self.assertEqual(conn.execute('SELECT thread_id FROM writes').fetchall(), [(self.other,)])
-        self.db.ingest('jingmai', 'test', 'buyer', '测试客户', [self.old])
+        self.db.ingest('desktop', 'test', 'buyer', '测试客户', [self.old])
         self.assertEqual(self.db.history(self.cid), [])
-        self.db.ingest('jingmai', 'test', 'buyer', '测试客户', [self.old, {'id': 'new', 'role': 'customer', 'text': '新问题'}])
+        self.db.ingest('desktop', 'test', 'buyer', '测试客户', [self.old, {'id': 'new', 'role': 'customer', 'text': '新问题'}])
         self.assertEqual([m['id'] for m in self.db.history(self.cid)], ['new'])
         self.assertTrue(self.db.history(self.other))
         self.assertTrue(self.app.knowledge.search('5V供电'))
@@ -60,25 +61,14 @@ class DataManagementCase(unittest.TestCase):
 
     def test_delete_customer_not_recreated_by_old_messages(self):
         delete_conversations(self.app, self.cid)
-        self.db.ingest('jingmai', 'test', 'buyer', '测试客户', [self.old])
+        self.db.ingest('desktop', 'test', 'buyer', '测试客户', [self.old])
         self.assertIsNone(self.db.one('SELECT id FROM conversations WHERE id=?', (self.cid,)))
         self.assertTrue(self.db.history(self.other))
-
-    def test_mock_clear_and_delete_all(self):
-        user = self.app.fixture.create_user('模拟删除测试')
-        msg = self.app.fixture.send_customer(user['id'], '待清理')
-        cid, _ = self.db.ingest('mock', 'local-shop', 'name:模拟删除测试', user['name'], [self.old])
-        delete_conversations(self.app, cid, keep_customer=True)
-        self.assertEqual(self.app.fixture.get_chat(user['id'])['messages'], [])
-        delete_conversations(self.app, all_customers=True)
-        self.assertFalse(self.app.fixture.list_users())
-        self.assertFalse(self.db.rows('SELECT * FROM conversations'))
-        self.assertTrue(self.db.rows('SELECT * FROM knowledge'))
 
     def test_delete_all_allows_a_fresh_read(self):
         delete_conversations(self.app, all_customers=True)
         self.assertFalse(self.db.rows('SELECT * FROM deleted_messages'))
-        self.db.ingest('jingmai', 'test', 'buyer', '测试客户', [self.old])
+        self.db.ingest('desktop', 'test', 'buyer', '测试客户', [self.old])
         self.assertTrue(self.db.history(self.cid))
 
     def test_active_or_paused_runtime_blocks_changes_and_export(self):
@@ -97,11 +87,10 @@ class DataManagementCase(unittest.TestCase):
                 export_workspace(self.app)
 
     def test_export_restore_roundtrip_and_secret_exclusion(self):
-        self.app.settings.save_runtime({'mock_url': 'http://127.0.0.1:19999/workbench'})
         data = export_workspace(self.app)
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             for name in archive.namelist():
-                for secret in (b'secret-test-unique-key', b'secret-hook', b'secret-signature', b'secret-feishu-app'):
+                for secret in (b'secret-test-unique-key', b'secret-hook', b'secret-signature', b'secret-feishu-app', b'secret-linkr-token'):
                     self.assertNotIn(secret, archive.read(name))
         package = self.root / 'export.zip'
         package.write_bytes(data)
@@ -112,7 +101,7 @@ class DataManagementCase(unittest.TestCase):
             self.assertEqual(len(restored.db.rows('SELECT * FROM tasks')), 1)
             self.assertEqual(restored.db.one('SELECT api_key FROM profiles')['api_key'], '')
             self.assertFalse(restored.settings.runtime()['feishu_enabled'])
-            self.assertEqual(restored.settings.runtime()['mock_url'], 'http://127.0.0.1:19000/workbench')
+            self.assertEqual(restored.settings.runtime()['linkr_token'], '')
             self.assertTrue(restored.knowledge.search('5V供电'))
             self.assertFalse(restored.runtime.status()['running'])
         finally:
@@ -127,7 +116,7 @@ class DataManagementCase(unittest.TestCase):
             self.assertIn(b'secret-test-unique-key', archive.read('business.sqlite3'))
             contents = {name: archive.read(name) for name in archive.namelist()}
         package = self.root / 'broken.zip'
-        contents['mock.json'] = b'{}'
+        contents['business.sqlite3'] = contents['business.sqlite3'] + b'corrupt'
         with zipfile.ZipFile(package, 'w') as archive:
             for name, value in contents.items():
                 archive.writestr(name, value)
@@ -140,8 +129,29 @@ class DataManagementCase(unittest.TestCase):
             restore_workspace(package, self.root / 'broken-target')
         self.assertFalse((self.root / 'escaped').exists())
 
+    def test_version_one_package_still_restores(self):
+        data = export_workspace(self.app)
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            payload = {name: archive.read(name) for name in archive.namelist() if name != 'manifest.json'}
+            manifest = json.loads(archive.read('manifest.json'))
+        payload['mock.json'] = b'{"rev": 1, "sessions": []}'
+        manifest.update(version=1, format='cs-rpa-workspace')
+        manifest['files'] = {name: hashlib.sha256(value).hexdigest() for name, value in payload.items()}
+        package = self.root / 'legacy-v1.zip'
+        with zipfile.ZipFile(package, 'w') as archive:
+            for name, value in payload.items():
+                archive.writestr(name, value)
+            archive.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False))
+        result = restore_workspace(package, self.root / 'legacy-restored')
+        restored = Application(Path(result['directory']), 'http://127.0.0.1:19001', env_path=None, import_root=None)
+        try:
+            self.assertTrue(restored.db.history(self.cid))
+            self.assertNotIn('mock_url', restored.settings.runtime())
+        finally:
+            restored.close()
+
     def test_waiting_workflow_resumes_after_migration(self):
-        cid, _ = self.db.ingest('jingmai', 'test', 'waiting', '售后测试', [{'id': 'w1', 'role': 'customer', 'text': '订单发货进度需要核实'}])
+        cid, _ = self.db.ingest('desktop', 'test', 'waiting', '售后测试', [{'id': 'w1', 'role': 'customer', 'text': '订单发货进度需要核实'}])
         config = {'configurable': {'thread_id': cid}}
         class Model:
             def __init__(self, profile):

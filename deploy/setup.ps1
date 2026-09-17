@@ -34,11 +34,5 @@ if (-not (Test-Path -LiteralPath $pythonExe)) {
 }
 & $pythonExe -m pip install -r (Join-Path $projectRoot 'requirements.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
-$edgePaths = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe")
-if (-not ($edgePaths | Where-Object { Test-Path -LiteralPath $_ })) {
-    & $pythonExe -m playwright install chromium
-    if ($LASTEXITCODE -ne 0) { throw 'Browser installation failed.' }
-    Write-Output 'Chromium installed. Select Chromium in the management page.'
-}
 Write-Output "Setup complete: $environmentDir"
 Write-Output 'Run: .\run.cmd serve'

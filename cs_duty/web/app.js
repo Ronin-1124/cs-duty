@@ -23,10 +23,10 @@ function render(){
   $('#version').textContent='v'+state.version;
   for(const key of ['conversations','sent','drafts','tasks'])$('#stat-'+key).textContent=state.counts[key];
   $('#nav-count').textContent=state.counts.conversations;
-  $('#runtime-title').textContent=({stopped:'服务已就绪',starting:'正在连接工作台',running:'正在接待客户',paused:'接待已暂停',stopping:'正在结束运行',waiting_login:'等待客服网页登录',error:'连接需要检查'})[runtime.state]||'客服接待';
+  $('#runtime-title').textContent=({stopped:'服务已就绪',starting:'正在连接客户端',running:'正在接待客户',paused:'接待已暂停',stopping:'正在结束运行',waiting_login:'等待客户端就绪',error:'连接需要检查'})[runtime.state]||'客服接待';
   $('#runtime-badge').outerHTML=badge(runtime.state).replace('<span ','<span id="runtime-badge" ');
   $('#runtime-detail').textContent=runtime.detail;
-  $('#runtime-target').textContent=state.config.transport==='mock'?'模拟页面':'真实页面 · 京东京麦';
+  $('#runtime-target').textContent='桌面客户端 · Linkr';
   $('#runtime-mode').textContent=state.config.mode==='auto'?'自动发送':'填写草稿';
   const active=state.profiles.items.find(p=>p.id===state.profiles.active);
   $('#runtime-model').textContent=active?.model||'尚未配置';
@@ -42,7 +42,7 @@ function render(){
   hydrate();
 }
 function renderReplies(){
-  setHTML($('#outbox'),state.outbox.length?state.outbox.map(o=>`<div class="reply-card" data-id="${esc(o.id)}"><div class="card-title"><b>${esc(o.name)}</b>${badge(o.status)}<time>${date(o.created)}</time></div>${o.status==='draft'?`<textarea data-edit="${esc(o.id)}" aria-label="${esc(o.name)}的回复草稿" maxlength="2000">${esc(edits.get(o.id)??o.reply)}</textarea>`:`<p>${esc(o.reply)}</p>`}${o.reason?`<p class="reason">${esc(o.reason)}</p>`:''}<div class="card-actions">${o.status==='draft'?'<button class="button quiet" data-outbox="cancel">取消</button><button class="button primary" data-outbox="approve">发送回复</button>':o.status==='uncertain'?'<button class="button secondary" data-outbox="cancel">核对后取消</button><button class="button primary" data-outbox="confirmed">确认网页已发送</button>':''}</div></div>`).join(''):empty('暂无待处理回复','新消息生成的回复会出现在这里。填写草稿模式不会自动点击网页发送按钮。','file-pen-line'));
+  setHTML($('#outbox'),state.outbox.length?state.outbox.map(o=>`<div class="reply-card" data-id="${esc(o.id)}"><div class="card-title"><b>${esc(o.name)}</b>${badge(o.status)}<time>${date(o.created)}</time></div>${o.status==='draft'?`<textarea data-edit="${esc(o.id)}" aria-label="${esc(o.name)}的回复草稿" maxlength="2000">${esc(edits.get(o.id)??o.reply)}</textarea>`:`<p>${esc(o.reply)}</p>`}${o.reason?`<p class="reason">${esc(o.reason)}</p>`:''}<div class="card-actions">${o.status==='draft'?'<button class="button quiet" data-outbox="cancel">取消</button><button class="button primary" data-outbox="approve">发送回复</button>':o.status==='uncertain'?'<button class="button secondary" data-outbox="cancel">核对后取消</button><button class="button primary" data-outbox="confirmed">确认客户端已发送</button>':''}</div></div>`).join(''):empty('暂无待处理回复','新消息生成的回复会出现在这里。填写草稿模式不会自动点击发送按钮。','file-pen-line'));
 }
 function renderConversations(){
   if(selectedCustomer&&!state.conversations.some(c=>c.id===selectedCustomer)){
@@ -64,7 +64,7 @@ async function loadHistory(force=false){
     if(token!==historyGeneration)return;
     historyVersion=version;
     const d=data.conversation;
-    $('#conversation-detail').innerHTML=`<div class="customer-detail-header"><div><h2>${esc(d.name)}</h2><p>${esc(d.shop)} · ${d.platform==='mock'?'模拟环境':'京东京麦'}</p></div><button class="button secondary" data-takeover="${d.state==='human'?'resume':'takeover'}">${d.state==='human'?'恢复接待':'同事接管'}</button><button class="button quiet" data-delete="clear">清空聊天</button><button class="button danger" data-delete="delete">删除客户</button></div><div class="chat-history">${data.messages.map(m=>`<div class="chat-turn ${m.role==='agent'?'agent':''}"><small>${m.role==='agent'?'客服同事':m.role==='customer'?'客户':'系统'} · ${esc(m.timestamp)}</small><p>${esc(m.text)}</p></div>`).join('')}</div>${Object.keys(d.fields).length?`<dl class="customer-fields">${Object.entries(d.fields).map(([k,v])=>`<dt>${esc(fields[k]||k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`:''}`;
+    $('#conversation-detail').innerHTML=`<div class="customer-detail-header"><div><h2>${esc(d.name)}</h2><p>${esc(d.shop)} · ${esc(d.platform==='desktop'?'桌面客户端':d.platform)}</p></div><button class="button secondary" data-takeover="${d.state==='human'?'resume':'takeover'}">${d.state==='human'?'恢复接待':'同事接管'}</button><button class="button quiet" data-delete="clear">清空聊天</button><button class="button danger" data-delete="delete">删除客户</button></div><div class="chat-history">${data.messages.map(m=>`<div class="chat-turn ${m.role==='agent'?'agent':''}"><small>${m.role==='agent'?'客服同事':m.role==='customer'?'客户':'系统'} · ${esc(m.timestamp)}</small><p>${esc(m.text)}</p></div>`).join('')}</div>${Object.keys(d.fields).length?`<dl class="customer-fields">${Object.entries(d.fields).map(([k,v])=>`<dt>${esc(fields[k]||k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`:''}`;
     const box=$('.chat-history');box.scrollTop=box.scrollHeight;hydrate();
   }catch(e){toast(e.message,true);}
 }
@@ -118,7 +118,7 @@ document.addEventListener('click',e=>{
   if(button.dataset.command)perform(button,async()=>{await api('runtime/'+button.dataset.command,{});});
   if(button.dataset.customer){selectedCustomer=button.dataset.customer;renderConversations();loadHistory(true);}
   if(button.dataset.takeover)perform(button,async()=>{await api('conversation',{id:selectedCustomer,action:button.dataset.takeover});historyVersion='';});
-  if(button.dataset.outbox)perform(button,async()=>{const id=button.closest('[data-id]').dataset.id;await api('outbox',{id,action:button.dataset.outbox,...(edits.has(id)?{reply:edits.get(id)}:{})});edits.delete(id);toast(button.dataset.outbox==='approve'?'已加入发送队列，接待运行时由 RPA 发送。':'已保存处理结果');});
+  if(button.dataset.outbox)perform(button,async()=>{const id=button.closest('[data-id]').dataset.id;await api('outbox',{id,action:button.dataset.outbox,...(edits.has(id)?{reply:edits.get(id)}:{})});edits.delete(id);toast(button.dataset.outbox==='approve'?'已加入发送队列，接待运行时由程序发送。':'已保存处理结果');});
   if(button.hasAttribute('data-resolve'))perform(button,async()=>{const id=button.closest('[data-id]').dataset.id;const result=taskResults.get(id)||'';if(!result.trim())throw new Error('请先填写处理结果');const saved=await api('tasks/resolve',{id,result});taskResults.delete(id);toast(saved.state==='human'?'处理结果已保存。该客户处于“同事接管”，请先在客户会话中点击“恢复接待”。':'处理结果已保存，运行接待时继续处理。');});
   if(button.dataset.profile){const id=button.closest('[data-id]').dataset.id;if(button.dataset.profile==='edit')fillProfile(state.profiles.items.find(p=>p.id===id));else perform(button,async()=>{const result=await api('profiles/'+button.dataset.profile,{id});if(button.dataset.profile==='test')toast(result.ok?`${result.model} 连接正常 · ${result.seconds} 秒`:'接口已返回，但测试内容未符合预期',!result.ok);else toast('已切换当前模型');});}
   if(button.dataset.knowledge)perform(button,async()=>{await api('knowledge/toggle',{id:button.dataset.knowledge,enabled:button.dataset.enabled==='1'});await loadKnowledge();});
@@ -145,7 +145,7 @@ document.addEventListener('click',e=>{
   const name=state.conversations.find(c=>c.id===selectedCustomer)?.name||'';
   $('#delete-title').textContent=action==='clear'?'清空聊天':action==='delete'?'删除客户':'删除全部客户与聊天';
   $('#delete-description').textContent=action==='delete_all'?'删除全部本地客户和关联记录，保留知识与配置。':
-    `将${action==='clear'?'清空':'删除'}「${name}」的聊天、草稿、待办和流程记忆。${action==='clear'?'保留客户。':'同时删除客户。'}模拟页记录会同步清理，京麦服务器记录不受影响。`;
+    `将${action==='clear'?'清空':'删除'}「${name}」的聊天、草稿、待办和流程记忆。${action==='clear'?'保留客户。':'同时删除客户。'}本地记录会同步清理，不影响客户端中的聊天。`;
   $('#delete-form').reset();$('#delete-dialog').showModal();
 });
 $('#close-delete').addEventListener('click',()=>$('#delete-dialog').close());
@@ -165,11 +165,9 @@ $('#export-data').addEventListener('click',e=>perform(e.currentTarget,async()=>{
 }));
 
 function updateReception(){
-  const form=$('#settings-form'),transport=form.elements.transport.value,real=transport==='jingmai',desktop=transport==='desktop',auto=form.elements.mode.value==='auto';
-  $('#mock-address').hidden=transport!=='mock';$('#real-address').hidden=!real;$('#channel-choice').hidden=desktop;$('#linkr-fields').hidden=!desktop;
-  $('#source-description').textContent=desktop?'通过 Radxa Linkr 读取桌面客户端截图并用 OCR 识别会话。':real?'打开京麦工作台，登录后读取正在咨询。':'使用本机模拟工作台接收测试咨询。';
-  $('#mode-description').textContent=auto?(desktop?'由程序填入回复并点击发送，再核对发送结果。':'由 RPA 填入回复、点击发送，并核对发送结果。'):(desktop?'由程序粘贴到客户端输入框，保留草稿，不点击发送。':'由 RPA 填入网页输入框，保留草稿，不点击发送。');
-  $('#reception-summary').textContent=(desktop?'桌面客户端 · Linkr':real?'真实页面 · 京东京麦':'模拟页面')+' / '+(auto?'自动发送':'填写草稿');
+  const auto=$('#settings-form').elements.mode.value==='auto';
+  $('#mode-description').textContent=auto?'由程序填入回复并点击发送，再核对发送结果。':'由程序把回复粘贴到客户端输入框，保留草稿，不点击发送。';
+  $('#reception-summary').textContent='桌面客户端 · Linkr / '+(auto?'自动发送':'填写草稿');
 }
 $('#settings-form').addEventListener('change',updateReception);
 
