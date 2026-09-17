@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 from playwright.sync_api import expect, sync_playwright
 from playwright._impl._errors import TargetClosedError
 
+from cs_duty.transport import ReadThrottle, TransportNotReady, comparable_text
+
 ACTIVE_PANE = '#t-alluser-wrap > .c_tabs > .c_tabs-content > .c_tabs-tabpane:not(.c_tabs-tab_inactive)'
 ROWS = ACTIVE_PANE + ' .alluser-item:visible'
 EDITOR = '.EditorContent[contenteditable=true]'
@@ -18,36 +20,25 @@ CONSULTING_TAB = '#t-alluser-wrap .c_tabs-nav-container > .c_tabs-tab[title="正
 STABLE_KEY_ATTRS = ('data-user-id', 'data-uid', 'data-userid', 'data-customer-id', 'data-key')
 
 
-class BrowserNotReady(RuntimeError):
-    """Safe, actionable status text without login URLs or customer data."""
+BrowserNotReady = TransportNotReady
 
 
-def comparable_text(text):
-    # Contenteditable may add blank lines when Chromium turns newlines into divs.
-    return re.sub(r'\n{2,}', '\n', text.replace('\r\n', '\n')).strip()
-
-
-class BrowserAdapter:
+class BrowserAdapter(ReadThrottle):
     def __init__(self, config, data_dir: Path):
+        super().__init__()
         self.config, self.data_dir = config, data_dir
         self.playwright = self.context = self.page = None
         self.cursor = 0
         self.confirmed_message = None
         self.initial_keys = None
-        self.read_cache = {}
         self.owned_drafts = {}
         self.key_attrs = {}
         self.cancelled = lambda: False
 
     def should_read(self, customer, force=False):
-        if self.config['transport'] == 'mock' or force:
+        if self.config['transport'] == 'mock':
             return True
-        previous = self.read_cache.get(customer['customer_key'])
-        fingerprint = (customer.get('preview', ''), customer.get('date', ''))
-        return not previous or previous[0] != fingerprint or time.monotonic() - previous[1] >= 60
-
-    def mark_read_snapshot(self, customer):
-        self.read_cache[customer['customer_key']] = ((customer.get('preview', ''), customer.get('date', '')), time.monotonic())
+        return super().should_read(customer, force)
 
     def scroll_contacts(self, top=False):
         # Locate the actual scrollable ancestor, including virtualized list wrappers.

@@ -10,8 +10,9 @@ from datetime import datetime, timedelta
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
-from cs_duty.browser import BrowserAdapter, BrowserNotReady, comparable_text
+from cs_duty.browser import BrowserAdapter
 from cs_duty.models import ModelClient, ModelError
+from cs_duty.transport import TransportNotReady, comparable_text
 from cs_duty.notifications import notify_task
 from cs_duty.workflow import Workflow
 
@@ -117,8 +118,8 @@ class Runtime:
                 except Exception as exc:
                     with self.lock:
                         if self.state != 'paused':
-                            state = 'waiting_login' if isinstance(exc, BrowserNotReady) else 'error'
-                            detail = str(exc) if isinstance(exc, BrowserNotReady) else f'客服列表读取失败（{type(exc).__name__}），请检查页面遮挡或页面结构变化'
+                            state = 'waiting_login' if isinstance(exc, TransportNotReady) else 'error'
+                            detail = str(exc) if isinstance(exc, TransportNotReady) else f'客服列表读取失败（{type(exc).__name__}），请检查页面遮挡或页面结构变化'
                             if (self.state, self.detail) != (state, detail):
                                 self.db.event('browser', detail)
                             self.state, self.detail = state, detail
