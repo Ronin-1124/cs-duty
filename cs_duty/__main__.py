@@ -99,6 +99,25 @@ def main(argv=None):
         print('采集完成：' + target)
         print('请确认文件不含需要保密的客户信息后再外发。')
         return 0
+    if argv and argv[0] == 'observe-desktop':
+        parser = argparse.ArgumentParser(description='只读采集桌面客户端截图与 OCR 结果（需先停止服务；含客户端文字，请勿外发）')
+        parser.add_argument('--data-dir', default='artifacts/app')
+        parser.add_argument('--out', default=None)
+        parser.add_argument('--no-wait', action='store_true', help='不等待手动打开会话')
+        args = parser.parse_args(argv[1:])
+        from pathlib import Path
+        from cs_duty.database import Database
+        from cs_duty.settings import Settings
+        from cs_duty.desktop.observe import capture as capture_desktop
+        data_dir = Path(args.data_dir)
+        db = Database(data_dir / 'business.sqlite3')
+        try:
+            target = capture_desktop(Settings(db, None).runtime(), data_dir, args.out, wait=not args.no_wait)
+        finally:
+            db.close()
+        print('采集完成：' + target)
+        print('产物包含客户端文字，请确认不含需要保密的客户信息后再外发。')
+        return 0
     if argv and argv[0] not in ('serve', '-h', '--help'):
         from mock_dongdong.cli import main as replica_cli
         return replica_cli(argv)
