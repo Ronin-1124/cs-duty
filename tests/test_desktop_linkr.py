@@ -45,13 +45,22 @@ class FakeHttp:
 
 
 class ContentBoxTests(unittest.TestCase):
-    def test_black_bars_are_trimmed(self):
+    def test_black_bars_are_trimmed_without_desktop_size(self):
         image = Image.open(io.BytesIO(frame_bytes()))
         self.assertEqual(_content_box(image), (100, 50, 1500, 900))
 
     def test_uniform_frame_keeps_full_image(self):
         image = Image.new('RGB', (320, 200), 'black')
         self.assertEqual(_content_box(image), (0, 0, 320, 200))
+
+    def test_mostly_dark_frame_is_not_collapsed(self):
+        image = Image.new('RGB', (400, 300), 'black')
+        ImageDraw.Draw(image).rectangle((200, 0, 399, 299), fill='white')
+        self.assertEqual(_content_box(image), (0, 0, 400, 300))
+
+    def test_desktop_size_gives_geometric_letterbox(self):
+        image = Image.new('RGB', (2560, 1440), 'black')
+        self.assertEqual(_content_box(image, (2560, 1600)), (128, 0, 2432, 1440))
 
 
 class LinkrClientTests(unittest.TestCase):
@@ -65,30 +74,33 @@ class LinkrClientTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'LINKR_TOKEN'):
                 LinkrClient(base_url='http://linkr.test', token=None)
 
-    def test_snapshot_crops_content_box_for_a_full_desktop_window(self):
+    def test_snapshot_maps_a_full_desktop_window_into_the_letterbox(self):
         client = self.client(frame_bytes())
         with patch('cs_duty.desktop.linkr._desktop_size', return_value=(2000, 1000)):
             shot = client.snapshot(window_rect=(0, 0, 2000, 1000))
         image = Image.open(io.BytesIO(shot.png))
-        self.assertEqual(image.size, (1400, 850))
-        self.assertEqual((shot.left, shot.top), (100, 50))
-        self.assertEqual((shot.width, shot.height), (1400, 850))
+        self.assertEqual(image.size, (1600, 800))
+        self.assertEqual((shot.left, shot.top), (0, 100))
+        self.assertEqual((shot.width, shot.height), (1600, 800))
         self.assertEqual((shot.frame_width, shot.frame_height), (1600, 1000))
+        self.assertEqual((shot.content_left, shot.content_top), (0, 100))
+        self.assertEqual((shot.content_width, shot.content_height), (1600, 800))
 
     def test_snapshot_without_window_keeps_the_full_frame(self):
         client = self.client(frame_bytes())
-        shot = client.snapshot()
+        with patch('cs_duty.desktop.linkr._desktop_size', return_value=(1600, 1000)):
+            shot = client.snapshot()
         image = Image.open(io.BytesIO(shot.png))
         self.assertEqual(image.size, (1600, 1000))
-        self.assertEqual((shot.left, shot.top), (100, 50))
+        self.assertEqual((shot.left, shot.top), (0, 0))
 
-    def test_snapshot_maps_desktop_window_into_content_box(self):
+    def test_snapshot_maps_a_partial_window_into_the_letterbox(self):
         client = self.client(frame_bytes())
         with patch('cs_duty.desktop.linkr._desktop_size', return_value=(2000, 1000)):
             shot = client.snapshot(window_rect=(0, 0, 1000, 500))
         image = Image.open(io.BytesIO(shot.png))
-        self.assertEqual(image.size, (700, 425))
-        self.assertEqual((shot.left, shot.top), (100, 50))
+        self.assertEqual(image.size, (800, 400))
+        self.assertEqual((shot.left, shot.top), (0, 100))
 
     def test_click_sends_press_release_sequence(self):
         client = self.client()
@@ -108,11 +120,19 @@ class LinkrClientTests(unittest.TestCase):
         events = client.http.posts[0]['json']['events']
         self.assertEqual(events[0][2:4], [0.0, 1.0])
 
-    def test_click_image_maps_cropped_pixel_to_frame(self):
+    def test_click_image_maps_cropped_pixel_to_desktop(self):
         client = self.client(frame_bytes())
-        shot = client.snapshot()
+        with patch('cs_duty.desktop.linkr._desktop_size', return_value=(2000, 1000)):
+            shot = client.snapshot(window_rect=(0, 0, 2000, 1000))
         normalized = client.click_image(shot, 350, 200)
-        self.assertEqual(normalized, ((100 + 350) / 1600, (50 + 200) / 1000))
+        self.assertEqual(normalized, (350 / 1600, 200 / 800))
+
+    def test_click_image_on_full_frame_accounts_for_the_letterbox(self):
+        client = self.client(frame_bytes())
+        with patch('cs_duty.desktop.linkr._desktop_size', return_value=(2000, 1000)):
+            shot = client.snapshot()
+        normalized = client.click_image(shot, 800, 550)
+        self.assertEqual(normalized, (800 / 1600, (550 - 100) / 800))
 
     def test_paste_sends_control_v(self):
         client = self.client()

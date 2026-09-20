@@ -22,26 +22,56 @@ class ScreenShot:
     top: int
     frame_width: int = 0
     frame_height: int = 0
+    content_left: int = 0
+    content_top: int = 0
+    content_width: int = 0
+    content_height: int = 0
 
 
 def _desktop_size() -> tuple[int, int]:
+    from cs_duty.desktop.window import enable_dpi_awareness
+    enable_dpi_awareness()
     return (
         int(user32.GetSystemMetrics(78) or 2560),
         int(user32.GetSystemMetrics(79) or 1600),
     )
 
 
-def _content_box(image: Image.Image, thr: float = 12.0) -> tuple[int, int, int, int]:
-    arr = np.asarray(image, dtype=np.float32)
-    luma = arr.mean(axis=2)
+def _content_box(image: Image.Image, desk_size: tuple[int, int] | None = None,
+                 thr: float = 12.0) -> tuple[int, int, int, int]:
+    """Locate the desktop inside the captured frame.
+
+    With a known desktop size the letterbox is pure geometry, which stays correct
+    for dark interfaces. Without it, uniform dark edge bands are trimmed instead,
+    and a mostly dark frame is never collapsed.
+    """
+    frame_w, frame_h = image.size
+    if desk_size:
+        desk_w, desk_h = desk_size
+        if desk_w > 0 and desk_h > 0:
+            scale = min(frame_w / desk_w, frame_h / desk_h)
+            cw, ch = max(1, round(desk_w * scale)), max(1, round(desk_h * scale))
+            if cw <= frame_w and ch <= frame_h:
+                x1, y1 = (frame_w - cw) // 2, (frame_h - ch) // 2
+                return x1, y1, x1 + cw, y1 + ch
+    luma = np.asarray(image, dtype=np.float32).mean(axis=2)
+    height, width = luma.shape
     col = luma.mean(axis=0)
     row = luma.mean(axis=1)
-    xs = np.where(col > thr)[0]
-    ys = np.where(row > thr)[0]
-    w, h = image.size
-    if len(xs) == 0 or len(ys) == 0:
-        return 0, 0, w, h
-    return int(xs[0]), int(ys[0]), int(xs[-1] + 1), int(ys[-1] + 1)
+
+    def span(values, size):
+        start, end = 0, size
+        while start < end - 1 and values[start] <= thr:
+            start += 1
+        while end > start + 1 and values[end - 1] <= thr:
+            end -= 1
+        return start, end
+
+    x1, x2 = span(col, width)
+    y1, y2 = span(row, height)
+    if x2 - x1 < width * .6 or y2 - y1 < height * .6:
+        return 0, 0, width, height
+    return x1, y1, x2, y2
 
 
 class LinkrClient:
@@ -73,8 +103,8 @@ class LinkrClient:
         response.raise_for_status()
         image = Image.open(io.BytesIO(response.content)).convert("RGB")
         frame_w, frame_h = image.size
-        cx1, cy1, cx2, cy2 = _content_box(image)
-        left, top, right, bottom = cx1, cy1, cx2, cy2
+        cx1, cy1, cx2, cy2 = _content_box(image, _desktop_size())
+        left, top, right, bottom = 0, 0, frame_w, frame_h
         if window_rect:
             desk_w, desk_h = _desktop_size()
             content_w = max(1, cx2 - cx1)
@@ -99,6 +129,10 @@ class LinkrClient:
             top=top,
             frame_width=frame_w,
             frame_height=frame_h,
+            content_left=cx1,
+            content_top=cy1,
+            content_width=cx2 - cx1,
+            content_height=cy2 - cy1,
         )
 
     def control(self, events: list[list[Any]]) -> dict[str, Any]:
@@ -127,10 +161,11 @@ class LinkrClient:
         )
 
     def click_image(self, shot: ScreenShot, px: float, py: float) -> tuple[float, float]:
-        fw = shot.frame_width or shot.width
-        fh = shot.frame_height or shot.height
-        nx = (shot.left + px) / fw
-        ny = (shot.top + py) / fh
+        # Linkr maps normalized coordinates onto the desktop, not the letterboxed frame.
+        cw = shot.content_width or shot.frame_width or shot.width
+        ch = shot.content_height or shot.frame_height or shot.height
+        nx = (shot.left + px - shot.content_left) / cw
+        ny = (shot.top + py - shot.content_top) / ch
         self.click(nx, ny)
         return nx, ny
 
