@@ -29,6 +29,7 @@ class SlotTable:
     slots: dict
     panels: dict
     path: Path
+    window_title: str = ''
 
     def point(self, name: str) -> tuple[float, float]:
         slot = self.slots.get(name)
@@ -68,6 +69,9 @@ def load_slots(path) -> SlotTable:
         raise SlotError('槽位文件缺少客户端进程名')
     if not isinstance(layout, str) or not layout.strip():
         raise SlotError('槽位文件缺少截图布局说明')
+    window_title = raw.get('window_title', '')
+    if not isinstance(window_title, str) or len(window_title) > 200:
+        raise SlotError('窗口标题过滤格式错误')
     slots, panels = raw.get('slots'), raw.get('panels')
     if not isinstance(slots, dict) or not isinstance(panels, dict):
         raise SlotError('槽位文件格式错误：slots 与 panels 必须是对象')
@@ -91,4 +95,5 @@ def load_slots(path) -> SlotTable:
         if not (0 <= x1 < x2 <= 1 and 0 <= y1 < y2 <= 1):
             raise SlotError(f'面板 {name} 的坐标必须在 0–1 之间且左上小于右下')
         checked_panels[name] = Panel(*map(float, panel))
-    return SlotTable(process=process.strip(), layout=layout.strip(), slots=checked, panels=checked_panels, path=path)
+    return SlotTable(process=process.strip(), layout=layout.strip(), slots=checked, panels=checked_panels,
+                     path=path, window_title=window_title.strip())

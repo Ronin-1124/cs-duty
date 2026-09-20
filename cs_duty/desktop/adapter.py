@@ -221,10 +221,17 @@ class DesktopAdapter(ReadThrottle):
         return 'uncertain', '发送结果未确认，请核对客户端后处理；不会自动重发'
 
     # -- capture helpers ---------------------------------------------------
-    def _locate_window(self):
+    def _matching_windows(self):
         matches = self._windows.find_windows(process=self.slots.process)
+        if self.slots.window_title:
+            matches = [window for window in matches if self.slots.window_title in (window.title or '')]
+        return matches
+
+    def _locate_window(self):
+        matches = self._matching_windows()
         if not matches:
-            raise TransportNotReady(f'未找到客户端窗口（{self.slots.process}）；请打开客户端并保持登录')
+            hint = f'，标题需包含“{self.slots.window_title}”' if self.slots.window_title else ''
+            raise TransportNotReady(f'未找到客户端窗口（{self.slots.process}{hint}）；请打开客户端并保持登录')
         visible = [window for window in matches if not window.minimized] or matches
         window = max(visible, key=lambda item: item.width * item.height)
         if not self._windows.focus_window(window.hwnd):
@@ -232,7 +239,7 @@ class DesktopAdapter(ReadThrottle):
         return window
 
     def _refresh_window(self):
-        matches = self._windows.find_windows(process=self.slots.process)
+        matches = self._matching_windows()
         match = next((window for window in matches if window.hwnd == self.window.hwnd), None)
         if match is None and matches:
             match = max(matches, key=lambda item: item.width * item.height)

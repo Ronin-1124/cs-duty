@@ -164,6 +164,20 @@ class AdapterFlowTests(unittest.TestCase):
         self.assertTrue(items[0]['initial_history'])
         self.assertFalse(items[1]['initial_history'])
 
+    def test_window_title_selects_the_reception_window(self):
+        workbench = WindowInfo(hwnd=1, title='千牛工作台', class_name='Qt', process='AliWorkbench',
+                               rect=(0, 0, 1000, 600), visible=True, minimized=False)
+        reception = WindowInfo(hwnd=2, title='千牛接待台', class_name='Qt', process='AliWorkbench',
+                               rect=(0, 0, 800, 500), visible=True, minimized=False)
+        with tempfile.TemporaryDirectory() as temp:
+            payload = json.loads(SLOTS.read_text(encoding='utf-8'))
+            payload.update(process='AliWorkbench', window_title='千牛接待台')
+            path = Path(temp) / 'slots.json'
+            path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
+            adapter = self.adapter([], windows=[workbench, reception], config={'slots_path': str(path)})
+            adapter.start()
+        self.assertEqual(adapter.window.hwnd, 2)
+
     def test_duplicate_display_names_are_skipped(self):
         adapter = self.adapter([[line('张三', 5, 40), line('张三', 5, 90)]])
         adapter.start()
@@ -239,6 +253,10 @@ class DesktopSettingsTests(unittest.TestCase):
         self.settings.save_runtime({'transport': 'desktop', 'linkr_token': 'secret-fixture'})
         self.settings.save_runtime({'transport': 'desktop', 'linkr_token': ''})
         self.assertEqual(self.settings.runtime()['linkr_token'], 'secret-fixture')
+
+    def test_slots_path_is_saved(self):
+        self.settings.save_runtime({'slots_path': 'experiments/qianniu_slots.json'})
+        self.assertEqual(self.settings.runtime()['slots_path'], 'experiments/qianniu_slots.json')
 
     def test_invalid_linkr_url_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'Linkr 地址'):

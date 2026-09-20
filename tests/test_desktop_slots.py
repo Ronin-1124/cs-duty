@@ -7,6 +7,7 @@ from cs_duty.desktop.slots import Panel, SlotError, load_slots
 
 ROOT = Path(__file__).resolve().parents[1]
 SLOTS = ROOT / 'experiments' / 'dongdong_slots.json'
+QIANNIU = ROOT / 'experiments' / 'qianniu_slots.json'
 
 
 class SlotTableTests(unittest.TestCase):
@@ -27,6 +28,13 @@ class SlotTableTests(unittest.TestCase):
         table = load_slots(SLOTS)
         self.assertEqual(table.panel('session_list'), Panel(0.040, 0.210, 0.205, 0.950))
         self.assertEqual(table.panel_pixels('session_list', 1000, 500), (40, 105, 205, 475))
+
+    def test_qianniu_table_targets_the_reception_window(self):
+        table = load_slots(QIANNIU)
+        self.assertEqual(table.process, 'AliWorkbench')
+        self.assertEqual(table.window_title, '千牛接待台')
+        self.assertEqual(table.point('send'), (0.9575, 0.939))
+        self.assertEqual(table.panel('chat'), Panel(0.237, 0.225, 0.990, 0.670))
 
     def test_missing_panel_is_reported(self):
         table = load_slots(SLOTS)

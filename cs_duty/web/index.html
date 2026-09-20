@@ -61,8 +61,9 @@
           <div class="reception-summary" id="reception-summary"></div>
           <label>店铺标识<input name="shop" required placeholder="例如：radxa-jd"></label>
           <div class="form-row"><label>Linkr 地址<input name="linkr_url" placeholder="留空使用 .env 或 http://linkr-usb.local"></label><label>Linkr Token<input name="linkr_token" type="password" autocomplete="new-password" placeholder="留空使用 .env 中的 LINKR_TOKEN"></label></div>
+          <label>槽位表路径<input name="slots_path" placeholder="留空使用 experiments/dongdong_slots.json；千牛用 experiments/qianniu_slots.json"></label>
           <label class="switch-label"><input name="allow_send" type="checkbox">允许自动点击发送（需先完成发送槽位标定）</label>
-          <p class="help-note">槽位表位于 experiments/dongdong_slots.json；标定与自检使用 run.cmd observe-desktop。</p>
+          <p class="help-note">标定与自检使用 run.cmd observe-desktop。</p>
           <details class="reception-advanced"><summary>读取与消息合并</summary><div class="form-row thirds"><label>扫描间隔（秒）<input name="poll_seconds" type="number" min="1" max="60"></label><label>消息合并等待（秒）<input name="merge_seconds" type="number" min="0" max="20"></label><label>每轮客户上限<input name="max_sessions" type="number" min="1" max="500"></label></div></details>
         </div></article>
         <article class="panel"><div class="panel-heading"><h2>定制需求收集</h2></div><div class="form"><p class="muted">收集以下信息后，创建同事待办。已提供的信息不会重复询问。</p><div id="custom-fields" class="checkbox-grid"></div><div class="persona-note"><i data-lucide="user-round-check"></i><div><b>客服同事的沟通方式</b><p>自然、温和、简洁地处理业务。以“我”或“这边”自然回应，查询与通知结果以实际执行记录为准。</p></div></div></div></article>

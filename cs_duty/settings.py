@@ -13,7 +13,7 @@ LEGACY_KEYS = ('transport', 'mock_url', 'jd_url', 'channel')
 DEFAULTS = {
     'shop': 'local-shop', 'mode': 'draft',
     'poll_seconds': 2, 'merge_seconds': 2, 'max_sessions': 100,
-    'linkr_url': '', 'linkr_token': '', 'allow_send': False, 'ocr_language': 'zh-Hans-CN',
+    'linkr_url': '', 'linkr_token': '', 'allow_send': False, 'ocr_language': 'zh-Hans-CN', 'slots_path': '',
     'custom_fields': ['product', 'requirements', 'quantity', 'deadline', 'contact'],
     'feishu_webhook': '', 'feishu_secret': '', 'feishu_enabled': False,
     'feishu_mode': 'webhook', 'feishu_app_id': '', 'feishu_app_secret': '',
@@ -76,6 +76,8 @@ class Settings:
             raise ValueError('自动发送开关无效')
         if not isinstance(config['ocr_language'], str) or not config['ocr_language'].strip() or len(config['ocr_language']) > 32:
             raise ValueError('OCR 语言标记格式错误')
+        if not isinstance(config['slots_path'], str) or len(config['slots_path']) > 300:
+            raise ValueError('槽位表路径格式错误')
         if not isinstance(config['custom_fields'], list) or not config['custom_fields'] or any(f not in FIELD_LABELS for f in config['custom_fields']):
             raise ValueError('定制收集字段无效')
         if config['feishu_webhook']:
