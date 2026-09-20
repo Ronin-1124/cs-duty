@@ -82,6 +82,7 @@ CSV 清洗行、问答候选、店铺规则、别名、核实事项、官方原�
 - 截图：`GET /api/public/snapshot`（处理 16:9 黑边后映射窗口）
 - 点击/粘贴：`POST /api/public/control` USB HID
 - 识别：Windows OCR（离线）读取会话列表、聊天记录与输入框；面板矩形与槽位见 `experiments/dongdong_slots.json`
+- 多客户端：接待设置中的"槽位表路径"可切换客户端，千牛接待台使用 `experiments/qianniu_slots.json`（`process: AliWorkbench`，按窗口标题 `千牛接待台` 定位）
 - 标定：`run.cmd observe-desktop` 输出带标注的截图与 OCR 结果，用于校正槽位
 - 默认不点「发送」，需显式开启并先标定发送槽位
 

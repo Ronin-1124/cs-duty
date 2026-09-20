@@ -64,7 +64,7 @@ LangGraph 节点为 `retrieve → plan → validate → record_reply/create_task
 
 ## 接入扩展
 
-客户通道是 `cs_duty.desktop.adapter.DesktopAdapter`：`LinkrClient` 负责 HDMI 截图与 USB HID，`slots.load_slots` 加载 `experiments/dongdong_slots.json` 的槽位与面板矩形，`ocr.WindowsOcrEngine` 使用系统 Windows OCR（离线）识别会话列表、聊天区与输入框，`window`/`clipboard` 负责窗口聚焦与粘贴。适配器向运行器提供列出客户、打开客户、读取消息、填草稿，以及标定后的发送；发送默认关闭，未标定槽位返回明确错误。网页 DOM 不再作为产品路径。业务图无需跟随客户端改版修改，改的是槽位表；`run.cmd observe-desktop` 用于标定与排查。
+客户通道是 `cs_duty.desktop.adapter.DesktopAdapter`：`LinkrClient` 负责 HDMI 截图与 USB HID，`slots.load_slots` 加载槽位表（默认 `experiments/dongdong_slots.json`；千牛为 `experiments/qianniu_slots.json`，可用 `slots_path` 切换）。槽位表可用 `window_title` 指定标题必须包含的窗口，避免选中同进程的主工作台；`ocr.WindowsOcrEngine` 使用系统 Windows OCR（离线）识别会话列表、聊天区与输入框，`window`/`clipboard` 负责窗口聚焦与粘贴。适配器向运行器提供列出客户、打开客户、读取消息、填草稿，以及标定后的发送；发送默认关闭，未标定槽位返回明确错误。网页 DOM 不再作为产品路径。业务图无需跟随客户端改版修改，改的是槽位表；`run.cmd observe-desktop` 用于标定与排查。
 
 `ModelClient` 提供 OpenAI Chat Completions 与 Anthropic Messages 两种协议，统一提取最终文本并解析业务 JSON。协议错误、HTTP 认证失败、限流和超时转为脱敏错误，运行器按客户退避重试；请求失败不生成可发送回复。
 
