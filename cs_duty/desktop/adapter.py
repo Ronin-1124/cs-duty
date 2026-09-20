@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from PIL import Image
+from dotenv import load_dotenv
 
 from cs_duty.database import ROOT
 from cs_duty.desktop.clipboard import set_clipboard_text
@@ -115,6 +116,8 @@ class DesktopAdapter(ReadThrottle):
     def start(self):
         self.slots = load_slots(self.config.get('slots_path') or ROOT / 'experiments' / 'dongdong_slots.json')
         if self._linkr is None:
+            # The project .env is the documented fallback for LINKR_BASE_URL/LINKR_TOKEN.
+            load_dotenv(ROOT / '.env')
             self._linkr = LinkrClient(self.config.get('linkr_url') or None, self.config.get('linkr_token') or None)
         if self._ocr is None:
             self._ocr = WindowsOcrEngine(self.config.get('ocr_language') or 'zh-Hans-CN')

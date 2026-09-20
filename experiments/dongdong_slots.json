@@ -1,17 +1,17 @@
 {
   "process": "jdm_dd_workbench",
   "layout": "2560x1600-letterbox-1440",
-  "notes": "Relative to cropped window image after Linkr letterbox. Calibrate on fullscreen 咚咚. Do not click send.",
+  "notes": "Relative to the maximized client window after Linkr letterbox. Calibrated 2026-09-20 on 咚咚融合工作台 10.4.7.500. Do not click send by default.",
   "slots": {
-    "session_consulting": {"x": 0.11, "y": 0.21, "label": "在线咨询/正在咨询"},
-    "session_clock": {"x": null, "y": null, "label": "最近咨询时钟，待标定"},
-    "session_recent": {"x": null, "y": null, "label": "最近联系人，待标定"},
-    "compose": {"x": 0.35, "y": 0.67, "label": "输入框"},
-    "send": {"x": null, "y": null, "label": "发送，默认禁止"}
+    "session_consulting": {"x": 0.066, "y": 0.231, "label": "在线咨询分组"},
+    "session_clock": {"x": 0.104, "y": 0.168, "label": "时钟筛选图标"},
+    "session_recent": {"x": null, "y": null, "label": "当前客户端无独立最近联系人入口"},
+    "compose": {"x": 0.42, "y": 0.665, "label": "输入框"},
+    "send": {"x": 0.537, "y": 0.977, "label": "发送（默认禁止）"}
   },
   "panels": {
-    "session_list": [0.08, 0.22, 0.28, 0.70],
-    "chat": [0.28, 0.22, 0.68, 0.66],
-    "order": [0.68, 0.18, 0.98, 0.85]
+    "session_list": [0.040, 0.210, 0.205, 0.950],
+    "chat": [0.205, 0.125, 0.700, 0.580],
+    "order": [0.705, 0.100, 0.990, 0.960]
   }
 }

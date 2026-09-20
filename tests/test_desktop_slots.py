@@ -14,18 +14,19 @@ class SlotTableTests(unittest.TestCase):
         table = load_slots(SLOTS)
         self.assertEqual(table.process, 'jdm_dd_workbench')
         self.assertIn('letterbox', table.layout)
-        self.assertEqual(table.point('compose'), (0.35, 0.67))
-        self.assertEqual(table.point_pixels('compose', 1000, 500), (350, 335))
+        self.assertEqual(table.point('compose'), (0.42, 0.665))
+        self.assertEqual(table.point_pixels('compose', 1000, 500), (420, 332))
+        self.assertEqual(table.point('send'), (0.537, 0.977))
 
     def test_uncalibrated_point_is_reported(self):
         table = load_slots(SLOTS)
         with self.assertRaisesRegex(SlotError, '尚未标定'):
-            table.point('send')
+            table.point('session_recent')
 
     def test_panel_pixels_scale(self):
         table = load_slots(SLOTS)
-        self.assertEqual(table.panel('session_list'), Panel(0.08, 0.22, 0.28, 0.70))
-        self.assertEqual(table.panel_pixels('session_list', 1000, 500), (80, 110, 280, 350))
+        self.assertEqual(table.panel('session_list'), Panel(0.040, 0.210, 0.205, 0.950))
+        self.assertEqual(table.panel_pixels('session_list', 1000, 500), (40, 105, 205, 475))
 
     def test_missing_panel_is_reported(self):
         table = load_slots(SLOTS)

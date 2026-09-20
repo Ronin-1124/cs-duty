@@ -1,4 +1,5 @@
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -118,7 +119,7 @@ def window(process='jdm_dd_workbench', minimized=False):
 
 SESSION_LINES = [line('最近联系人', 5, 2, height=18), line('张三', 5, 40), line('还有货吗', 70, 42, height=20),
                  line('10:24', 150, 42, width=40, height=16)]
-CHAT_LINES = [line('你好', 10, 40, height=22), line('在的，有什么能帮您的吗', 120, 90, height=22)]
+CHAT_LINES = [line('你好', 10, 40, height=22), line('在的，有什么能帮您的吗', 400, 90, height=22)]
 REPLY = '在的，有什么能帮您的吗'
 
 
@@ -141,6 +142,16 @@ class AdapterFlowTests(unittest.TestCase):
         adapter.start()
         self.assertEqual(adapter.window.hwnd, 7)
         self.assertTrue(adapter._windows.focused)
+
+    def test_start_falls_back_to_env_for_linkr_credentials(self):
+        from unittest.mock import patch
+        adapter = self.adapter([], config={'linkr_url': '', 'linkr_token': ''})
+        adapter._linkr = None
+        with patch('cs_duty.desktop.adapter.LinkrClient') as linkr, \
+                patch('cs_duty.desktop.adapter.load_dotenv') as loader:
+            adapter.start()
+        loader.assert_called_once()
+        self.assertEqual(linkr.call_args.args[:2], (None, None))
 
     def test_customers_marks_first_scan_as_initial_history(self):
         adapter = self.adapter([SESSION_LINES, SESSION_LINES + [line('李四', 5, 90)]])
@@ -190,11 +201,16 @@ class AdapterFlowTests(unittest.TestCase):
         self.assertIn('未启用', reason)
 
     def test_send_with_uncalibrated_slot_keeps_draft(self):
-        scripts = [SESSION_LINES, CHAT_LINES, CHAT_LINES, [], [line(REPLY, 10, 20, height=28)], CHAT_LINES, CHAT_LINES]
-        adapter = self.adapter(scripts, config={'allow_send': True})
-        adapter.start()
-        source_id = parse_transcript(CHAT_LINES, 200)[-1]['id']
-        status, reason = adapter.send('张三', source_id, REPLY, lambda: True)
+        with tempfile.TemporaryDirectory() as temp:
+            payload = json.loads(SLOTS.read_text(encoding='utf-8'))
+            payload['slots']['send'] = {'x': None, 'y': None, 'label': 'uncalibrated'}
+            path = Path(temp) / 'slots.json'
+            path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
+            scripts = [SESSION_LINES, CHAT_LINES, CHAT_LINES, [], [line(REPLY, 10, 20, height=28)], CHAT_LINES, CHAT_LINES]
+            adapter = self.adapter(scripts, config={'allow_send': True, 'slots_path': str(path)})
+            adapter.start()
+            source_id = parse_transcript(CHAT_LINES, 200)[-1]['id']
+            status, reason = adapter.send('张三', source_id, REPLY, lambda: True)
         self.assertEqual(status, 'draft')
         self.assertIn('发送未标定', reason)
 
