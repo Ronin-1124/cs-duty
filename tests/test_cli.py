@@ -27,6 +27,15 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("usage:", result.stdout)
 
+    def test_help_lists_every_command(self):
+        result = subprocess.run(
+            [sys.executable, "-S", "-m", "cs_duty", "--help"],
+            cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=15,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for command in ('serve', 'restore-data', 'import-knowledge', 'feishu-check', 'observe-desktop'):
+            self.assertIn(command, result.stdout)
+
     def test_feishu_check_fails_without_credentials(self):
         with tempfile.TemporaryDirectory() as temp:
             out, err = io.StringIO(), io.StringIO()
