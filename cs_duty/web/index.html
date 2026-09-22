@@ -61,6 +61,7 @@
           <div class="reception-summary" id="reception-summary"></div>
           <label>店铺标识<input name="shop" required placeholder="例如：radxa-jd"></label>
           <div class="form-row"><label>Linkr 地址<input name="linkr_url" placeholder="留空使用 .env 或 http://linkr-usb.local"></label><label>Linkr Token<input name="linkr_token" type="password" autocomplete="new-password" placeholder="留空使用 .env 中的 LINKR_TOKEN"></label></div>
+          <label>OCR 引擎<select name="ocr_engine"><option value="rapidocr">RapidOCR · PP-OCR（推荐）</option><option value="windows">Windows 系统 OCR</option></select></label>
           <label>槽位表路径<input name="slots_path" placeholder="留空使用 experiments/dongdong_slots.json；千牛用 experiments/qianniu_slots.json"></label>
           <label class="switch-label"><input name="allow_send" type="checkbox">允许自动点击发送（需先完成发送槽位标定）</label>
           <p class="help-note">标定与自检使用 run.cmd observe-desktop。</p>
