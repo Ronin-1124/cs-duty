@@ -2,16 +2,17 @@
   "process": "AliWorkbench",
   "window_title": "千牛接待台",
   "layout": "2560x1600-letterbox-1440",
-  "notes": "Relative to the 千牛接待台 window after Linkr letterbox. Calibrated 2026-09-20 on 千牛 9.97; the session list and chat area still need a live conversation to verify. Do not click send by default.",
+  "notes": "Relative to the 千牛接待台 window after Linkr letterbox. Calibrated 2026-09-20 against a live session with the customer/order side panel open. Do not click send by default.",
   "slots": {
-    "session_consulting": {"x": 0.0755, "y": 0.353, "label": "正在接待标签页"},
-    "session_clock": {"x": null, "y": null, "label": "当前客户端无此时钟入口"},
+    "session_consulting": {"x": 0.075, "y": 0.236, "label": "正在接待标签页"},
+    "session_clock": {"x": 0.105, "y": 0.168, "label": "时钟筛选图标"},
     "session_recent": {"x": null, "y": null, "label": "当前客户端无独立最近联系人入口"},
-    "compose": {"x": 0.5, "y": 0.82, "label": "输入框"},
-    "send": {"x": 0.9575, "y": 0.939, "label": "发送（默认禁止）"}
+    "compose": {"x": 0.445, "y": 0.84, "label": "输入框"},
+    "send": {"x": 0.6335, "y": 0.963, "label": "发送（默认禁止）"}
   },
   "panels": {
-    "session_list": [0.056, 0.500, 0.235, 0.970],
-    "chat": [0.237, 0.225, 0.990, 0.670]
+    "session_list": [0.050, 0.290, 0.210, 0.945],
+    "chat": [0.185, 0.270, 0.690, 0.700],
+    "order": [0.680, 0.085, 0.995, 0.990]
   }
 }

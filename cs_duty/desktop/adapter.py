@@ -7,20 +7,49 @@ import re
 import time
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 from dotenv import load_dotenv
 
 from cs_duty.database import ROOT
 from cs_duty.desktop.clipboard import set_clipboard_text
 from cs_duty.desktop.linkr import LinkrClient
-from cs_duty.desktop.ocr import WindowsOcrEngine
+from cs_duty.desktop.ocr import create_ocr_engine
 from cs_duty.desktop.slots import SlotError, load_slots
-from cs_duty.desktop.window import find_windows, focus_window
+from cs_duty.desktop.window import find_windows, focus_window, raise_window
 from cs_duty.transport import ReadThrottle, TransportNotReady, comparable_text
 
 TIME_RE = re.compile(r'(\d{1,2}[:：]\d{2})')
 GROUP_RE = re.compile(r'^(在线咨询|正在咨询|最近联系人|全部|留言|其他)$')
+HEADER_RE = re.compile(r'^(正在接待|待回复|全部买家|其他消息|联系人)\s*[（(]?\d*[）)]?$')
+UI_LABELS = re.compile(r'^(智能.{0,4}|AI.{0,6})$')
+TRANSCRIPT_UI = re.compile(r'^(优化答案|重新生成|复制|翻译)$')
 COMPOSE_MARGIN = (340, 70)
+AVATAR_MARGIN = 80
+
+
+def _avatar_centers(image, left, right):
+    """Vertical centers of avatar blobs inside a margin strip."""
+    if image is None:
+        return []
+    box = (max(0, int(left)), 0, min(image.width, int(right)), image.height)
+    if box[2] - box[0] < 6:
+        return []
+    strip = np.asarray(image.crop(box), dtype=np.int16)
+    luma = strip.mean(axis=2)
+    chroma = strip.max(axis=2) - strip.min(axis=2)
+    rows = ((luma < 200) | (chroma > 40)).mean(axis=1) > 0.15
+    centers, start = [], None
+    for y, hit in enumerate(rows):
+        if hit and start is None:
+            start = y
+        elif not hit and start is not None:
+            if y - start >= 8:
+                centers.append((start + y) // 2)
+            start = None
+    if start is not None and len(rows) - start >= 8:
+        centers.append((start + len(rows)) // 2)
+    return centers
 
 
 def _median_height(lines):
@@ -46,15 +75,26 @@ def _bounds(cluster):
     return left, top, right, bottom
 
 
+def transcript_signature(messages):
+    """Coarse transcript state: count plus the last bubble, so loading animations do not block."""
+    last = messages[-1] if messages else {}
+    return (len(messages), last.get('role', ''), last.get('text', ''))
+
+
 def parse_session_rows(lines):
     """Group OCR lines into session rows: name, preview, date, group, box."""
-    rows, group, tolerance = [], '', max(6.0, _median_height(lines) * 0.9)
+    rows, group, tolerance = [], '', max(6.0, _median_height(lines) * 1.7)
     for cluster in _clusters(lines, tolerance):
         cluster.sort(key=lambda line: line.x)
-        if len(cluster) == 1 and GROUP_RE.match(cluster[0].text.strip()):
-            group = cluster[0].text.strip()
+        first = cluster[0].text.strip()
+        if len(cluster) == 1 and GROUP_RE.match(first):
+            group = first
             continue
-        name = cluster[0].text.strip()
+        if HEADER_RE.match(first) or UI_LABELS.match(first):
+            continue
+        if not re.search(r'[\u4e00-\u9fffA-Za-z]', first):
+            continue
+        name = re.sub(r'(?<=[\u4e00-\u9fff])\s+(?=[0-9])|(?<=[0-9])\s+(?=[\u4e00-\u9fff])', '', first)
         body = cluster[1:]
         date = ''
         if body and len(body[-1].text.strip()) <= 12 and TIME_RE.search(body[-1].text):
@@ -66,12 +106,15 @@ def parse_session_rows(lines):
     return rows
 
 
-def parse_transcript(lines, midpoint):
-    """Group OCR lines into chat bubbles, assigning role by horizontal position."""
+def parse_transcript(lines, midpoint, image=None):
+    """Group OCR lines into chat bubbles, assigning role by avatar margin or position."""
     if not lines:
         return []
     tolerance = max(6.0, _median_height(lines) * 0.8)
+    left_centers = _avatar_centers(image, 0, AVATAR_MARGIN + 4)
+    right_centers = _avatar_centers(image, image.width - AVATAR_MARGIN - 4, image.width) if image else []
     messages = []
+    agent_run, previous_bottom, agent_left = False, None, None
     for cluster in _clusters(lines, tolerance):
         cluster.sort(key=lambda line: (line.y, line.x))
         left, top, right, bottom = _bounds(cluster)
@@ -81,8 +124,29 @@ def parse_transcript(lines, midpoint):
         if TIME_RE.fullmatch(text) and messages:
             messages[-1]['timestamp'] = text
             continue
-        messages.append({'role': 'agent' if (left + right) / 2 > midpoint else 'customer',
-                         'text': text, 'timestamp': ''})
+        if TRANSCRIPT_UI.match(text):
+            continue
+        role = None
+        if image is not None:
+            left_avatar = any(top - 30 <= center <= bottom + 30 for center in left_centers)
+            right_avatar = any(top - 30 <= center <= bottom + 30 for center in right_centers)
+            if left_avatar != right_avatar:
+                role = 'customer' if left_avatar else 'agent'
+        if role == 'agent':
+            agent_run, agent_left = True, left
+        elif role is None:
+            if (agent_run and previous_bottom is not None and top - previous_bottom <= 70
+                    and agent_left is not None and abs(left - agent_left) <= 60):
+                role = 'agent'
+            else:
+                role = 'agent' if (left + right) / 2 > midpoint else 'customer'
+                agent_run = role == 'agent'
+                if agent_run:
+                    agent_left = left
+        else:
+            agent_run = False
+        previous_bottom = bottom
+        messages.append({'role': role, 'text': text, 'timestamp': ''})
     counts = {}
     for message in messages:
         digest = hashlib.sha1(f"{message['role']}|{message['text']}|{message['timestamp']}".encode()).hexdigest()[:16]
@@ -120,7 +184,8 @@ class DesktopAdapter(ReadThrottle):
             load_dotenv(ROOT / '.env')
             self._linkr = LinkrClient(self.config.get('linkr_url') or None, self.config.get('linkr_token') or None)
         if self._ocr is None:
-            self._ocr = WindowsOcrEngine(self.config.get('ocr_language') or 'zh-Hans-CN')
+            self._ocr = create_ocr_engine(self.config.get('ocr_engine') or 'windows',
+                                          self.config.get('ocr_language') or 'zh-Hans-CN')
         self.window = self._locate_window()
         self._capture()
 
@@ -235,7 +300,9 @@ class DesktopAdapter(ReadThrottle):
         visible = [window for window in matches if not window.minimized] or matches
         window = max(visible, key=lambda item: item.width * item.height)
         if not self._windows.focus_window(window.hwnd):
-            raise TransportNotReady('无法将客户端窗口置于前台，请关闭遮挡窗口后重试')
+            raise_ = getattr(self._windows, 'raise_window', None)
+            if raise_ is None or not raise_(window.hwnd):
+                raise TransportNotReady('无法将客户端窗口置于前台，请关闭遮挡窗口后重试')
         return window
 
     def _refresh_window(self):
@@ -255,13 +322,17 @@ class DesktopAdapter(ReadThrottle):
             raise TransportNotReady('客户端截图失败，请检查 Linkr 连接')
         return shot
 
-    def _read_panel(self, shot, panel):
+    def _read_panel_image(self, shot, panel):
         image = Image.open(io.BytesIO(shot.png))
         x1, y1, x2, y2 = self.slots.panel_pixels(panel, image.width, image.height)
         crop = image.crop((x1, y1, x2, y2))
         buffer = io.BytesIO()
         crop.save(buffer, 'PNG')
-        return (x1, y1, x2, y2), self._ocr.read_lines(buffer.getvalue())
+        return (x1, y1, x2, y2), crop, self._ocr.read_lines(buffer.getvalue())
+
+    def _read_panel(self, shot, panel):
+        box, _, lines = self._read_panel_image(shot, panel)
+        return box, lines
 
     def _scan_sessions(self, shot):
         _, lines = self._read_panel(shot, 'session_list')
@@ -269,8 +340,8 @@ class DesktopAdapter(ReadThrottle):
 
     def _transcript(self):
         shot = self._capture()
-        box, lines = self._read_panel(shot, 'chat')
-        return parse_transcript(lines, (box[2] - box[0]) / 2)
+        box, crop, lines = self._read_panel_image(shot, 'chat')
+        return parse_transcript(lines, (box[2] - box[0]) / 2, image=crop)
 
     def _stable_transcript(self):
         previous, stable_since = None, None
@@ -279,7 +350,7 @@ class DesktopAdapter(ReadThrottle):
             if self.cancelled():
                 raise TransportNotReady('正在停止会话读取')
             messages = self._transcript()
-            signature = [message['id'] for message in messages]
+            signature = transcript_signature(messages)
             if signature != previous:
                 previous, stable_since = signature, time.monotonic()
             elif time.monotonic() - stable_since >= self.stability_seconds:
@@ -325,3 +396,4 @@ class DesktopAdapter(ReadThrottle):
 class _WindowApi:
     find_windows = staticmethod(find_windows)
     focus_window = staticmethod(focus_window)
+    raise_window = staticmethod(raise_window)

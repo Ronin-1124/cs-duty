@@ -33,8 +33,8 @@ class SlotTableTests(unittest.TestCase):
         table = load_slots(QIANNIU)
         self.assertEqual(table.process, 'AliWorkbench')
         self.assertEqual(table.window_title, '千牛接待台')
-        self.assertEqual(table.point('send'), (0.9575, 0.939))
-        self.assertEqual(table.panel('chat'), Panel(0.237, 0.225, 0.990, 0.670))
+        self.assertEqual(table.point('send'), (0.6335, 0.963))
+        self.assertEqual(table.panel('chat'), Panel(0.185, 0.270, 0.690, 0.700))
 
     def test_missing_panel_is_reported(self):
         table = load_slots(SLOTS)

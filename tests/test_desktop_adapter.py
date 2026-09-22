@@ -1,13 +1,13 @@
-import io
+﻿import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from cs_duty.database import Database
-from cs_duty.desktop.adapter import DesktopAdapter, parse_session_rows, parse_transcript
+from cs_duty.desktop.adapter import DesktopAdapter, parse_session_rows, parse_transcript, transcript_signature
 from cs_duty.desktop.linkr import ScreenShot
 from cs_duty.desktop.ocr import TextLine
 from cs_duty.desktop.window import WindowInfo
@@ -46,8 +46,37 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(rows[0]['preview'], '还有货吗')
 
     def test_session_rows_keep_leave_group(self):
-        rows = parse_session_rows([line('留言', 10, 5, height=20), line('王五', 10, 40)])
+        rows = parse_session_rows([line('留言', 10, 5, height=20), line('王五', 10, 40, height=20)])
         self.assertEqual(rows[0]['group'], '留言')
+
+    def test_qianniu_rows_merge_multiline_and_skip_headers(self):
+        lines = [
+            line('正在接待 1', 0, 10, height=18), line('最后一句消息', 150, 10, height=18),
+            line('快乐的小布丁 123', 50, 100, height=20),
+            line('托管中 ] 亲，全店可开票', 50, 130, height=18),
+            line('0', 200, 300, height=18),
+            line('智能助手', 100, 400, height=18),
+        ]
+        rows = parse_session_rows(lines)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['name'], '快乐的小布丁123')
+        self.assertIn('托管中', rows[0]['preview'])
+
+    def test_transcript_signature_tracks_count_and_last_bubble(self):
+        messages = [{'role': 'customer', 'text': '你好'}, {'role': 'agent', 'text': '在的'}]
+        self.assertEqual(transcript_signature(messages), (2, 'agent', '在的'))
+        self.assertEqual(transcript_signature([]), (0, '', ''))
+        changed = messages + [{'role': 'customer', 'text': '型号呢'}]
+        self.assertNotEqual(transcript_signature(messages), transcript_signature(changed))
+
+    def test_transcript_uses_avatar_margins_for_roles(self):
+        image = Image.new('RGB', (600, 200), 'white')
+        draw = ImageDraw.Draw(image)
+        draw.ellipse((2, 30, 30, 58), fill=(30, 30, 30))
+        draw.ellipse((570, 120, 598, 148), fill=(240, 130, 40))
+        lines = [line('你好', 40, 34, height=22), line('在的', 400, 124, height=22)]
+        messages = parse_transcript(lines, 300, image=image)
+        self.assertEqual([message['role'] for message in messages], ['customer', 'agent'])
 
     def test_transcript_assigns_roles_and_times(self):
         lines = [
@@ -257,6 +286,11 @@ class DesktopSettingsTests(unittest.TestCase):
     def test_slots_path_is_saved(self):
         self.settings.save_runtime({'slots_path': 'experiments/qianniu_slots.json'})
         self.assertEqual(self.settings.runtime()['slots_path'], 'experiments/qianniu_slots.json')
+
+    def test_ocr_engine_defaults_to_rapidocr_and_rejects_unknown(self):
+        self.assertEqual(self.settings.runtime()['ocr_engine'], 'rapidocr')
+        with self.assertRaisesRegex(ValueError, 'OCR 引擎'):
+            self.settings.save_runtime({'ocr_engine': 'magic'})
 
     def test_invalid_linkr_url_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'Linkr 地址'):
