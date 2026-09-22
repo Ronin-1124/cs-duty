@@ -82,7 +82,16 @@ class Runtime:
         pending, arrivals = {}, {}
         fatal_error = False
         try:
-            adapter.start()
+            # A covered or hidden client window is retryable, not fatal.
+            while not self.stop_event.is_set():
+                try:
+                    adapter.start()
+                    break
+                except TransportNotReady as exc:
+                    with self.lock:
+                        self.state, self.detail = 'waiting_login', str(exc)
+                    self.db.event('client', str(exc))
+                    self.stop_event.wait(3)
             with self.lock:
                 if not self.stop_event.is_set():
                     self.state, self.detail = 'running', '正在通过客户端读取消息'
@@ -186,8 +195,9 @@ class Runtime:
                         else:
                             value = self._input(current, leave_message=leave_message)
                         pending[cid] = (pool.submit(graph.invoke, value, thread_config), '')
-                    except Exception:
-                        self.db.event('client', '一个会话读取未完成，将在下一轮重新检查')
+                    except Exception as exc:
+                        detail = str(exc)[:120] if isinstance(exc, TransportNotReady) else f'{type(exc).__name__}: {str(exc)[:100]}'
+                        self.db.event('client', f'一个会话读取未完成（{detail}），将在下一轮重新检查')
                 if self.state == 'running' and not self.stop_event.is_set():
                     if config['mode'] == 'draft':
                         self._fill_drafts(adapter)

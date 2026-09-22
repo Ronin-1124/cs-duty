@@ -149,6 +149,20 @@ def find_windows(
     return matches
 
 
+def raise_window(hwnd: int) -> bool:
+    """Bring the window above others without stealing keyboard focus."""
+    HWND_TOPMOST, HWND_NOTOPMOST = -1, -2
+    SWP_NOMOVE, SWP_NOSIZE, SWP_NOACTIVATE = 0x0002, 0x0001, 0x0010
+    user32.SetWindowPos.argtypes = [wt.HWND, wt.HWND, ctypes.c_int, ctypes.c_int,
+                                    ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+    user32.SetWindowPos.restype = wt.BOOL
+    flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+    if not user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags):
+        return False
+    user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags)
+    return True
+
+
 def focus_window(hwnd: int, timeout: float = 2.0, attempts: int = 4) -> bool:
     enable_dpi_awareness()
     if user32.IsIconic(hwnd):
